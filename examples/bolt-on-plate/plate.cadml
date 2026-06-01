@@ -1,0 +1,29 @@
+version 0.1
+units mm
+description "Flat mounting plate with a single bolt hole and a `<port>` named `hole` on the top face. The port's position + normal + up vector give a downstream assembly enough info to align a bolt to the hole."
+
+param size  = 40
+param thick = 6
+param hole-d = 8
+
+<part name="plate" color="#506070">
+  <difference>
+    <extrude height="{thick}">
+      <rect x="{-size / 2}" y="{-size / 2}"
+            width="{size}" height="{size}" rx="3"/>
+    </extrude>
+    <!-- Centre through-hole. -->
+    <group transform="translate(0, 0, -1)">
+      <extrude height="{thick + 2}">
+        <circle r="{hole-d / 2}"/>
+      </extrude>
+    </group>
+  </difference>
+
+  <!-- `hole` port on the top face. Normal +z points "outward" toward
+       where the bolt approaches from. A bolt declared with
+       `head-seat` normal -z will mate face-to-face by pure
+       translation (anti-parallel normals → no rotation). -->
+  <port name="hole" position="0 0 {thick}"
+                     normal="0 0 1" up="1 0 0"/>
+</part>

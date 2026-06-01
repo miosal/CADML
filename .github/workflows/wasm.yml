@@ -1,0 +1,48 @@
+# CI: build CADML to WebAssembly and run the end-to-end node test.
+#
+# Mirrors the local recipe in src/wasm/README.md (emsdk 5.0.7 + ninja), on a
+# Linux runner where emcc/emcmake land on PATH automatically.
+
+name: wasm
+
+on:
+  push:
+    paths:
+      - 'src/**'
+      - '.github/workflows/wasm.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - '.github/workflows/wasm.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (to run the wasm module)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '5.0.7'
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Configure (FetchContent pulls all deps)
+        run: cmake --preset wasm
+
+      - name: Build cadml.wasm
+        run: cmake --build build/wasm
+
+      - name: Report artifact size
+        run: ls -l build/wasm/cadml.js build/wasm/cadml.wasm
+
+      - name: End-to-end test
+        working-directory: src/wasm
+        run: node test_cadml_wasm.cjs

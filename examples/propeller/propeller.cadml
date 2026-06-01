@@ -1,0 +1,49 @@
+version 0.1
+units mm
+description "5-inch drone propeller (3-blade, 5045 pitch). The blade is a 12-station polyhedral loft of Clark-Y airfoils whose chord and twist are computed by propeller.lua from the propeller's tip radius and pitch. The hub is a simple cylindrical extrude. Three blades are placed 120 degrees apart via <pattern>."
+
+import "propeller.lua"
+
+param prop-r    = 63.5
+param pitch     = 114.3
+param hub-r     = 6
+param hub-h     = 6
+param bore      = 5
+param overshoot = 1
+
+<def name="blade">
+  <loft>
+    <for var="t" from="0" to="1" steps="12">
+      <sketch plane="xy"
+              origin="0 0 {propeller.station_r(t)}"
+              rotation="{propeller.station_beta(t)}">
+        <path d="{propeller.station_path(t)}"/>
+      </sketch>
+    </for>
+  </loft>
+</def>
+
+<part name="propeller" color="#4A4A4A">
+  <union>
+    <!-- Hub with center bore. -->
+    <difference>
+      <extrude height="{hub-h}" symmetric="true">
+        <circle r="{hub-r}"/>
+      </extrude>
+      <group transform="translate(0, 0, {-(hub-h / 2 + overshoot)})">
+        <extrude height="{hub-h + overshoot * 2}">
+          <circle r="{bore / 2}"/>
+        </extrude>
+      </group>
+    </difference>
+
+    <!-- 3 blades at 120-degree intervals. The blade is authored
+         with its span along Z, then rotated 90 deg around X to lay
+         it flat in the prop plane before patterning. -->
+    <pattern type="circular" count="3" axis="z">
+      <group transform="rotate(90, 1, 0, 0)">
+        <blade/>
+      </group>
+    </pattern>
+  </union>
+</part>

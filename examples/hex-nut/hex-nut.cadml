@@ -1,0 +1,134 @@
+version 0.1
+units mm
+description "Hex nut, M8, modeled to ISO 4032 + ISO 68-1 (60° metric thread). 13 mm across-flats, 6.5 mm thick, with 30° chamfers on both faces (hex frustums modelled via <loft> between full and scaled hex sketches) and a sharp-V tapped internal thread that mates with the spec-correct hex-bolt example. Internal thread is a 60° V cutter swept along a helix at the bore wall, with its base flaring outward to the major diameter — same numerics as the bolt's external cutter, so the bolt's V-crests interlock cleanly with the nut's V-roots."
+
+param thread-d         = 8
+param thread-pitch     = 1.25
+param across-flats     = 13
+param thickness        = 6.5
+param chamfer-h        = 0.6
+param chamfer-scale    = 0.85
+
+param thread-tri-h      = {0.866025 * thread-pitch}
+param thread-cut-depth  = {thread-tri-h}
+param thread-axial-half = {thread-pitch / 2}
+param thread-overshoot  = 0.1
+param minor-r           = {thread-d / 2 - thread-cut-depth}
+param thread-turns      = {(thickness - 2 * chamfer-h) / thread-pitch}
+
+param hex-c             = {across-flats / 1.732}
+param hex-w             = {across-flats / 3.464}
+param hex-h             = {across-flats / 2}
+param hex-c-s           = {chamfer-scale * hex-c}
+param hex-w-s           = {chamfer-scale * hex-w}
+param hex-h-s           = {chamfer-scale * hex-h}
+
+<part name="hex-nut" color="#9090a0">
+  <union>
+    <difference>
+      <union>
+        <!-- Bottom chamfer: lofted hex frustum from a scaled hex at
+           z=0 up to the full hex at z=chamfer-h. Linear interpolation
+           between the two 6-vertex profiles produces 6 trapezoidal
+           side faces — that's the 30° chamfer wrapping every flat
+           and every corner of the nut, just like ISO 4032. -->
+      <loft>
+        <sketch plane="xy" origin="0 0 0">
+          <path d="M {hex-c-s}, 0
+                   L {hex-w-s},  {hex-h-s}
+                     {-hex-w-s}, {hex-h-s}
+                     {-hex-c-s}, 0
+                     {-hex-w-s}, {-hex-h-s}
+                     {hex-w-s},  {-hex-h-s}
+                     Z"/>
+        </sketch>
+        <sketch plane="xy" origin="0 0 {chamfer-h}">
+          <path d="M {hex-c}, 0
+                   L {hex-w},  {hex-h}
+                     {-hex-w}, {hex-h}
+                     {-hex-c}, 0
+                     {-hex-w}, {-hex-h}
+                     {hex-w},  {-hex-h}
+                     Z"/>
+        </sketch>
+      </loft>
+
+      <!-- Middle prism: full-size hex from chamfer-h up to
+           thickness-chamfer-h. -->
+      <group transform="translate(0, 0, {chamfer-h})">
+        <extrude height="{thickness - 2 * chamfer-h}">
+          <path d="M {hex-c}, 0
+                   L {hex-w},  {hex-h}
+                     {-hex-w}, {hex-h}
+                     {-hex-c}, 0
+                     {-hex-w}, {-hex-h}
+                     {hex-w},  {-hex-h}
+                     Z"/>
+        </extrude>
+      </group>
+
+      <!-- Top chamfer: lofted hex frustum from full hex at
+           z=thickness-chamfer-h up to scaled hex at z=thickness. -->
+      <loft>
+        <sketch plane="xy" origin="0 0 {thickness - chamfer-h}">
+          <path d="M {hex-c}, 0
+                   L {hex-w},  {hex-h}
+                     {-hex-w}, {hex-h}
+                     {-hex-c}, 0
+                     {-hex-w}, {-hex-h}
+                     {hex-w},  {-hex-h}
+                     Z"/>
+        </sketch>
+        <sketch plane="xy" origin="0 0 {thickness}">
+          <path d="M {hex-c-s}, 0
+                   L {hex-w-s},  {hex-h-s}
+                     {-hex-w-s}, {hex-h-s}
+                     {-hex-c-s}, 0
+                     {-hex-w-s}, {-hex-h-s}
+                     {hex-w-s},  {-hex-h-s}
+                     Z"/>
+        </sketch>
+        </loft>
+      </union>
+
+      <!-- Bore at the MAJOR radius. The thread ridge below adds
+           material back inward, creating V-crests that engage the
+           bolt's external thread. Boring at major (then UNIONing
+           a ridge inward) reuses the bolt's external-thread cutter
+           shape directly — apex inward, base just past the helix
+           radius — instead of trying to subtract V-grooves
+           outward through the bore wall. -->
+      <group transform="translate(0, 0, -1)">
+        <extrude height="{thickness + 2}">
+          <circle r="{thread-d / 2}"/>
+        </extrude>
+      </group>
+    </difference>
+
+    <!-- Helical V ridge protruding INWARD from the bore wall.
+         Sweep is bounded to the cylindrical middle zone (between
+         the top + bottom loft chamfers): starts at z=chamfer-h,
+         length covers thickness - 2·chamfer-h. Outside that zone
+         the body has tapered inward (loft frustums), so a ridge
+         extending past z=chamfer-h or z=thickness-chamfer-h would
+         have no body to land against. The chamfer face stays a
+         clean conical surface; threads run out at the boundary.
+
+         Cutter shape is the hex-bolt's exact external-thread cutter:
+         apex at radial = -cut-depth = -H (inward toward axis, lands
+         at radius major - H = minor), base at +overshoot (just
+         outside the bore wall, so the union absorbs the ridge into
+         the body cleanly). -->
+    <group transform="translate(0, 0, {chamfer-h})">
+      <sweep>
+        <helix radius="{thread-d / 2}"
+               pitch="{thread-pitch}"
+               turns="{thread-turns}"/>
+        <path d="M {-thread-cut-depth}, 0
+                 L {thread-overshoot}, {-thread-axial-half}
+                   {thread-overshoot}, {thread-axial-half}
+                 Z"/>
+      </sweep>
+    </group>
+  </union>
+</part>

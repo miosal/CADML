@@ -1,0 +1,185 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 miosal@cadml.org
+
+#include <cadml/compile/bundler.hpp>
+
+#include <gtest/gtest.h>
+
+#include <string>
+#include <vector>
+
+using namespace cadml::compile;
+
+namespace {
+
+std::vector<InMemoryFile> files(std::initializer_list<InMemoryFile> fs) {
+    return std::vector<InMemoryFile>(fs);
+}
+
+}  // namespace
+
+// ─── Single file ────────────────────────────────────────────────────
+
+TEST(InMemory, SingleFileNoImports) {
+    auto r = compile_in_memory(
+        files({ { "main.cadml",
+                  "version 0.1\n<part name=\"x\"><circle r=\"5\"/></part>" } }),
+        "main.cadml");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_NE(r.flat_text.find("<part"), std::string::npos);
+    EXPECT_NE(r.flat_text.find("circle"), std::string::npos);
+    // The entry's <source path="..."> is the supplied key, not "<entry>".
+    EXPECT_NE(r.flat_text.find("path=\"main.cadml\""), std::string::npos);
+}
+
+TEST(InMemory, MissingEntryErrors) {
+    auto r = compile_in_memory(
+        files({ { "main.cadml", "version 0.1\n<part name=\"x\"/>" } }),
+        "not-there.cadml");
+    EXPECT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Import);
+}
+
+// ─── Multi-file imports by map key ──────────────────────────────────
+
+TEST(InMemory, ImportProducesDef) {
+    auto r = compile_in_memory(
+        files({
+            { "bolt.cadml",
+              "version 0.1\nparam length = 30\n"
+              "<part><extrude height=\"{length}\"><circle r=\"5\"/></extrude></part>" },
+            { "main.cadml",
+              "version 0.1\nimport \"bolt.cadml\"\n<part><bolt/></part>" },
+        }),
+        "main.cadml");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_NE(r.flat_text.find("<def name=\"bolt\""), std::string::npos);
+    EXPECT_EQ(r.flat_text.find("import \""), std::string::npos);
+    EXPECT_NE(r.flat_text.find("<param name=\"length\""), std::string::npos);
+}
+
+TEST(InMemory, SubdirRelativeImportResolves) {
+    // An entry in a subdir importing a sibling, plus a parent-relative
+    // import that normalizes back to the root — both must resolve to the
+    // right map keys.
+    auto r = compile_in_memory(
+        files({
+            { "lib/helper.cadml",
+              "version 0.1\n<part><circle r=\"2\"/></part>" },
+            { "root.cadml",
+              "version 0.1\n<part><circle r=\"9\"/></part>" },
+            { "sub/main.cadml",
+              "version 0.1\n"
+              "import \"helper.cadml\" as h\n"          // sub/helper? no — see below
+              "<part><h/></part>" },
+        }),
+        "sub/main.cadml");
+    // sub/main imports "helper.cadml" → key "sub/helper.cadml", which is
+    // NOT in the map → expect a clean import error (proves keys are
+    // resolved relative to the importing file's dir).
+    EXPECT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("cannot find imported file: sub/helper.cadml")
+            != std::string::npos) found = true;
+    EXPECT_TRUE(found) << "expected sub/-relative key in the not-found error";
+}
+
+TEST(InMemory, ParentRelativeImportResolvesToRoot) {
+    auto r = compile_in_memory(
+        files({
+            { "shared/box.cadml",
+              "version 0.1\n<part><rect width=\"4\" height=\"4\"/></part>" },
+            { "sub/main.cadml",
+              "version 0.1\n"
+              "import \"../shared/box.cadml\" as box\n"   // → key "shared/box.cadml"
+              "<part><box/></part>" },
+        }),
+        "sub/main.cadml");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_NE(r.flat_text.find("<def name=\"box\""), std::string::npos);
+    // The shared file is recorded under its normalized root-relative key.
+    EXPECT_NE(r.flat_text.find("path=\"shared/box.cadml\""), std::string::npos);
+}
+
+TEST(InMemory, LuaModuleImport) {
+    auto r = compile_in_memory(
+        files({
+            { "helpers.lua",
+              "function dbl(x) return x * 2 end\n" },
+            { "main.cadml",
+              "version 0.1\nimport \"helpers.lua\"\n"
+              "<part><extrude height=\"{helpers.dbl(5)}\">"
+              "<rect width=\"1\" height=\"1\"/></extrude></part>" },
+        }),
+        "main.cadml");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    // The Lua call is evaluated eagerly at bundle time → 10 lands literal.
+    EXPECT_NE(r.flat_text.find("height=\"10\""), std::string::npos);
+}
+
+// ─── Security: traversal is structurally rejected ───────────────────
+
+TEST(InMemory, ParentEscapeRejected) {
+    auto r = compile_in_memory(
+        files({
+            { "main.cadml",
+              "version 0.1\nimport \"../../etc/passwd\"\n<part/>" },
+        }),
+        "main.cadml");
+    EXPECT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("outside the project root") != std::string::npos)
+            found = true;
+    EXPECT_TRUE(found) << "../ escape must be refused";
+}
+
+TEST(InMemory, RootAnchoredImportRejected) {
+    auto r = compile_in_memory(
+        files({
+            { "main.cadml",
+              "version 0.1\nimport \"/etc/passwd\"\n<part/>" },
+        }),
+        "main.cadml");
+    EXPECT_FALSE(r.ok());
+}
+
+// ─── Cycle detection works through the in-memory provider ───────────
+
+TEST(InMemory, CircularImportDetected) {
+    auto r = compile_in_memory(
+        files({
+            { "a.cadml", "version 0.1\nimport \"b.cadml\"\n<part><b/></part>" },
+            { "b.cadml", "version 0.1\nimport \"a.cadml\"\n<part><a/></part>" },
+        }),
+        "a.cadml");
+    EXPECT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("circular import") != std::string::npos) found = true;
+    EXPECT_TRUE(found);
+}
+
+// ─── Parity with compile_string on the single-file case ─────────────
+
+TEST(InMemory, ParityWithCompileStringSingleFile) {
+    const std::string src =
+        "version 0.1\n"
+        "param r = 4\n"
+        "<part name=\"p\"><extrude height=\"10\"><circle r=\"{r}\"/></extrude></part>";
+
+    // compile_string (no base_dir) and compile_in_memory should produce
+    // identical geometry. The <sources> path differs ("<entry>" vs the
+    // map key), so compare the body after the sources block.
+    auto a = compile_string(src);
+    auto b = compile_in_memory(files({ { "p.cadml", src } }), "p.cadml");
+    ASSERT_TRUE(a.ok()) << (a.errors.empty() ? "" : a.errors[0].message);
+    ASSERT_TRUE(b.ok()) << (b.errors.empty() ? "" : b.errors[0].message);
+
+    auto body = [](const std::string& s) {
+        const auto pos = s.find("<part");
+        return pos == std::string::npos ? s : s.substr(pos);
+    };
+    EXPECT_EQ(body(a.flat_text), body(b.flat_text));
+}

@@ -1,0 +1,27 @@
+version 0.1
+units mm
+description "Spur gear with involute tooth profile. The tooth shape is computed by gear.lua's involute_gear() — base / pitch / outer / root radii from the standard module-and-pressure-angle formulas, with each tooth's flank traced by points along the involute curve and joined to the next tooth via a tip arc and a root arc. The gear blank is centred on the X-Y plane (z = -face-width/2 .. +face-width/2) with a clearance bore through the middle."
+
+import "gear.lua"
+
+param module          = 2
+param teeth           = 16
+param pressure-angle  = 20
+param face-width      = 8
+param bore            = 5
+param overshoot       = 1
+
+<part name="gear" color="#708090">
+  <group transform="translate(0, 0, {-face-width / 2})">
+    <difference>
+      <extrude height="{face-width}">
+        <path d="{gear.involute_gear(module, teeth, pressure-angle, 12)}"/>
+      </extrude>
+      <group transform="translate(0, 0, {-overshoot})">
+        <extrude height="{face-width + overshoot * 2}">
+          <circle r="{bore / 2}"/>
+        </extrude>
+      </group>
+    </difference>
+  </group>
+</part>

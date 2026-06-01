@@ -1,0 +1,50 @@
+version 0.1
+units mm
+description "Slip-on pipe flange in the geometry family of ANSI B16.5 NPS-1 Class 150 (108 mm OD, 79.4 mm bolt circle, 2 in raised face, 35 mm bore) but drilled for four M16-clearance bolts instead of the standard imperial 5/8\" UNC. The bolt-circle is generated with one `<pattern type=\"circular\" count=\"4\">`. Stepped raised face uses two stacked extrudes; a single revolve would also work for a smoother chamfered profile."
+
+param od         = 108
+param bore-d     = 35
+param thick      = 14
+param raised-d   = 51
+param raised-h   = 2
+param bolt-bcd   = 79.4
+param bolt-d     = 17
+param bolts      = 4
+
+<part name="flange" color="red">
+  <difference>
+    <union>
+      <!-- Main disc. -->
+      <extrude height="{thick}">
+        <circle r="{od / 2}"/>
+      </extrude>
+      <!-- Raised face (the gasket-bearing surface). Stacked on top
+           of the main disc so the boolean union absorbs the seam. -->
+      <group transform="translate(0, 0, {thick})">
+        <extrude height="{raised-h}">
+          <circle r="{raised-d / 2}"/>
+        </extrude>
+      </group>
+    </union>
+
+    <!-- Pipe bore through the centre. Overshoots both faces by 1 mm
+         so the boolean cuts cleanly through. -->
+    <group transform="translate(0, 0, -1)">
+      <extrude height="{thick + raised-h + 2}">
+        <circle r="{bore-d / 2}"/>
+      </extrude>
+    </group>
+
+    <!-- Bolt circle: four holes at 90 deg around the centre. The
+         pattern instances the single hole geometry rotated about Z;
+         each instance becomes a separate cutter in the difference. -->
+    <pattern type="circular" count="{bolts}" axis="z">
+      <group transform="translate({bolt-bcd / 2}, 0, -1)">
+        <extrude height="{thick + raised-h + 2}">
+          <circle r="{bolt-d / 2}"/>
+        </extrude>
+      </group>
+    </pattern>
+  </difference>
+</part>
+

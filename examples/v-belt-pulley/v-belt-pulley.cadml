@@ -1,0 +1,39 @@
+version 0.1
+units mm
+description "V-belt pulley, A-section (5/8 in. nominal), 60 mm OD with a 19 mm bore. The meridional profile is a path with the standard 34-degree V-groove cut into the OD; revolving it around Z gives the full pulley body in one shot. Hub bore is a separate cylindrical extrude removed via difference."
+
+param od        = 60
+param bore-d    = 19
+param hub-w     = 18
+param groove-w  = 14
+param groove-d  = 10
+param groove-r  = {groove-w / 2 / 0.554}
+
+<part name="pulley" color="#a0a0a0">
+  <difference>
+    <!-- Pulley body. The meridional profile (in (radial, axial)
+         coords for axis="z") traces:
+         hub OD → outer rim → into the V-groove face at 34 deg →
+         groove root → back out the symmetric face → outer rim →
+         hub OD (mirrored), then the back face. -->
+    <revolve axis="z" angle="360">
+      <path d="M {bore-d / 2}, 0
+               L {od / 2}, 0
+                 {od / 2}, {(hub-w - groove-w) / 2}
+                 {od / 2 - groove-d}, {hub-w / 2}
+                 {od / 2}, {hub-w - (hub-w - groove-w) / 2}
+                 {od / 2}, {hub-w}
+                 {bore-d / 2}, {hub-w}
+                 Z"/>
+    </revolve>
+
+    <!-- Through-bore for the shaft. Slightly oversized in z so the
+         boolean cleanly cuts both flat faces (the overshoot prevents
+         coplanar surfaces at the cut boundary). -->
+    <group transform="translate(0, 0, -1)">
+      <extrude height="{hub-w + 2}">
+        <circle r="{bore-d / 2}"/>
+      </extrude>
+    </group>
+  </difference>
+</part>

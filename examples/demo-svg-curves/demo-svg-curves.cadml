@@ -1,0 +1,66 @@
+version 0.1
+units mm
+description "SVG curve commands inside <svg>: cubic Bezier (C/S), quadratic (Q/T), elliptical arc (A) plus rounded-corner construction. One part per curve family. Pasted with SVG y-down coordinates; the <svg> wrapper handles the y-flip."
+
+<!-- Part 1: a heart shape via two cubic Beziers (C). The classic
+     SVG idiom: M (start at apex), C up-and-out + back-down for the
+     left lobe, C up + back-down for the right lobe. -->
+<part name="heart" color="red">
+  <svg>
+    <extrude height="4">
+      <path d="M 0,0 C -10,-15 -25,-5 0,15 C 25,-5 10,-15 0,0 Z"/>
+    </extrude>
+  </svg>
+</part>
+
+<!-- Part 2: a rounded rectangle built with H/V/Q corners. Real-world
+     SVG icons use exactly this idiom for buttons/badges/cards. -->
+<part name="rounded-rect" color="blue">
+  <group transform="translate(50, 0, 0)">
+    <svg>
+      <extrude height="3">
+        <path d="
+          M 5,0 H 25
+          Q 30,0 30,5 V 25
+          Q 30,30 25,30 H 5
+          Q 0,30 0,25 V 5
+          Q 0,0 5,0 Z"/>
+      </extrude>
+    </svg>
+  </group>
+</part>
+
+<!-- Part 3: a circle traced with two arcs (A). Common in font glyphs
+     and logos. -->
+<part name="ring" color="orange">
+  <group transform="translate(95, 15, 0)">
+    <svg>
+      <difference>
+        <extrude height="3">
+          <path d="M 12,0 A 12,12 0 1 1 -12,0 A 12,12 0 1 1 12,0 Z"/>
+        </extrude>
+        <group transform="translate(0, 0, -1)">
+          <extrude height="5">
+            <path d="M 6,0 A 6,6 0 1 1 -6,0 A 6,6 0 1 1 6,0 Z"/>
+          </extrude>
+        </group>
+      </difference>
+    </svg>
+  </group>
+</part>
+
+<!-- Part 4: smooth-cubic chain (S) — a wave profile. S reuses the
+     reflection of the previous cubic's last control point. -->
+<part name="wave" color="green">
+  <group transform="translate(140, 0, 0)">
+    <svg>
+      <extrude height="3">
+        <path d="
+          M 0,15
+          C 10,5 15,5 25,15
+          S 40,25 50,15
+          L 50,30 L 0,30 Z"/>
+      </extrude>
+    </svg>
+  </group>
+</part>

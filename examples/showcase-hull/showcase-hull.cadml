@@ -1,0 +1,70 @@
+version 0.1
+units mm
+description "Demonstrates <hull> — the simple-loft case (square -> circle, square -> bigger square / frustum) plus a single-input hull around protrusions. Four parts laid out side-by-side."
+
+param spacing = 70
+
+<!-- Part 1: square base blends into a circle on top.
+     Loft-style transition between two profiles, expressed with
+     <hull>: two thin extrudes at different z heights, hulled
+     together. -->
+<part name="square-to-circle" color="orange">
+  <hull>
+    <extrude height="0.5">
+      <rect x="-10" y="-10" width="20" height="20"/>
+    </extrude>
+    <group transform="translate(0, 0, 30)">
+      <extrude height="0.5">
+        <circle r="8"/>
+      </extrude>
+    </group>
+  </hull>
+</part>
+
+<!-- Part 2: small square -> bigger square frustum.
+     Same trick but both profiles are squares of different
+     sizes -> straight-walled frustum. -->
+<part name="square-frustum" color="blue">
+  <group transform="translate({spacing}, 0, 0)">
+    <hull>
+      <extrude height="0.5">
+        <rect x="-4" y="-4" width="8" height="8"/>
+      </extrude>
+      <group transform="translate(0, 0, 30)">
+        <extrude height="0.5">
+          <rect x="-12" y="-12" width="24" height="24"/>
+        </extrude>
+      </group>
+    </hull>
+  </group>
+</part>
+
+<!-- Part 3: hull of multiple extrudes at the same z height —
+     gives a stadium-like envelope around two cylinders. -->
+<part name="stadium" color="green">
+  <group transform="translate({spacing * 2}, 0, 0)">
+    <hull>
+      <extrude height="20">
+        <circle r="8"/>
+      </extrude>
+      <group transform="translate(20, 0, 0)">
+        <extrude height="20">
+          <circle r="8"/>
+        </extrude>
+      </group>
+    </hull>
+  </group>
+</part>
+
+<!-- Part 4: single-child hull of a concave shape (the chevron
+     from the path showcase). The hull rounds out the concave
+     notch into the convex envelope. -->
+<part name="hull-of-chevron" color="red">
+  <group transform="translate({spacing * 3}, 0, 0)">
+    <hull>
+      <extrude height="6">
+        <path d="M -15,0 l 15,20 15,-20 -8,0 -7,10 -7,-10 z"/>
+      </extrude>
+    </hull>
+  </group>
+</part>

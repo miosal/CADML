@@ -1,0 +1,35 @@
+version 0.1
+units mm
+description "Axle pin for the caster — a plain cylinder with three named ports for assembly mating. `end-a` and `end-b` are the two ends that seat in the fork's leg holes; `mid` is the midpoint where the wheel hub mounts. Local frame: axle axis along +z, body spans z = 0 to z = length."
+
+param length = 50
+param dia    = 8
+
+<part name="axle" color="#c8c8d0">
+  <extrude height="{length}">
+    <circle r="{dia / 2}"/>
+  </extrude>
+
+  <!-- Port normals follow the CADML face-to-face mating convention:
+       a port's normal points TOWARD where its mating partner sits.
+       Two mating ports therefore have anti-parallel normals — the
+       same convention the bolt-on-plate test uses (a bolt head with
+       normal -z mates a plate hole with normal +z; both pointing
+       AT each other across the mating plane). -->
+
+  <!-- end-a: the leg material that this end seats into sits in -z
+       direction from end-a in axle-local (the axle's body is in +z,
+       so the leg lives on the opposite side). -->
+  <port name="end-a" position="0 0 0"        normal="0 0 -1" up="1 0 0"/>
+
+  <!-- end-b: the other leg sits in +z direction from end-b. -->
+  <port name="end-b" position="0 0 {length}" normal="0 0 1"  up="1 0 0"/>
+
+  <!-- mid: the wheel hub surrounds this point symmetrically; the
+       normal is along the axle axis (used only to align the wheel's
+       rotation axis with the axle, not to express a contact face).
+       Chosen as -z so a wheel.hub declared with normal +z mates by
+       pure translation. -->
+  <port name="mid"   position="0 0 {length / 2}"
+                      normal="0 0 -1" up="1 0 0"/>
+</part>

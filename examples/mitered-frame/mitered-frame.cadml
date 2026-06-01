@@ -1,0 +1,122 @@
+version 0.1
+units mm
+description "Miter / bevel / compound demo. Picture frame at the origin: 4 square-tube rails, each end cut with `<cut type='miter' angle='±45'>` so adjacent rails butt cleanly at 90° corners. Off to one side, three single-rail demos with one square end and one cut end show what each <cut> type does in isolation: a pure miter (Y-axis tilt → horizontal angle), a pure bevel (X-axis tilt → vertical angle), and a compound (both at once → tilted-and-skewed face, the cut you machine for hopper corner posts, hip rafters, or angled crown molding)."
+
+param tube-size = 30
+param tube-wall = 2
+param frame-w   = 400
+param frame-h   = 300
+param half-tube = {tube-size / 2}
+
+param demo-y0   = {frame-h * 0.6}
+param demo-step = {tube-size * 2.5}
+param demo-len  = {frame-w * 0.6}
+
+<def name="rail">
+  <param name="len" value="100"/>
+  <difference>
+    <extrude height="{len}">
+      <rect x="{-tube-size / 2}" y="{-tube-size / 2}"
+            width="{tube-size}" height="{tube-size}"/>
+    </extrude>
+    <extrude height="{len}">
+      <rect x="{-(tube-size - 2 * tube-wall) / 2}" y="{-(tube-size - 2 * tube-wall) / 2}"
+            width="{tube-size - 2 * tube-wall}" height="{tube-size - 2 * tube-wall}"/>
+    </extrude>
+  </difference>
+</def>
+
+<!-- ── Picture frame: 4 mitered rails ──────────────────────────────
+     Each rail is the full frame edge length plus one tube-size of
+     overshoot, so the half-tube of material consumed by each 45°
+     miter at each end leaves the finished outer dimension exactly
+     at frame-w × frame-h.
+
+     Cut-angle sign rule (see cookbook 03-mitered-tube): for a tube
+     rotated 90° about Y so it lies along world X, local +X maps to
+     world -Z. The angle's sign appears reversed in world space, so
+     the rail whose OUTER frame edge is world -Z (bottom rail) uses
+     a negative miter, and the rail whose outer edge is world +Z
+     (top rail) uses a positive miter. Uprights aren't rotated, so
+     their signs follow the local-frame convention directly. -->
+
+<part name="bottom-rail" color="#4477AA">
+  <group transform="translate({-half-tube}, 0, {-half-tube}) rotate(90, 0, 1, 0)">
+    <cut face="start" type="miter" angle="-45">
+      <cut face="end" type="miter" angle="-45">
+        <rail len="{frame-w + tube-size}"/>
+      </cut>
+    </cut>
+  </group>
+</part>
+
+<part name="top-rail" color="#4477AA">
+  <group transform="translate({-half-tube}, 0, {frame-h + half-tube}) rotate(90, 0, 1, 0)">
+    <cut face="start" type="miter" angle="45">
+      <cut face="end" type="miter" angle="45">
+        <rail len="{frame-w + tube-size}"/>
+      </cut>
+    </cut>
+  </group>
+</part>
+
+<part name="left-upright" color="#6699CC">
+  <group transform="translate(0, 0, {-half-tube})">
+    <cut face="start" type="miter" angle="45">
+      <cut face="end" type="miter" angle="45">
+        <rail len="{frame-h + tube-size}"/>
+      </cut>
+    </cut>
+  </group>
+</part>
+
+<part name="right-upright" color="#6699CC">
+  <group transform="translate({frame-w}, 0, {-half-tube})">
+    <cut face="start" type="miter" angle="-45">
+      <cut face="end" type="miter" angle="-45">
+        <rail len="{frame-h + tube-size}"/>
+      </cut>
+    </cut>
+  </group>
+</part>
+
+<!-- ── Three side-by-side demo rails, one cut type each ─────────────
+     Each rail starts square at face=start and is cut at face=end so
+     the angled face is unambiguous. They sit along world Y, far
+     enough apart that the cut faces are easy to read. -->
+
+<!-- Pure miter: Y-axis tilt in the tube's local frame. After the
+     90° Y rotation, this manifests as a horizontal slice — the
+     same cut as a picture-frame corner. End face leans 30° in
+     plan. -->
+<part name="miter-only" color="#AA4444">
+  <group transform="translate({-half-tube}, {demo-y0}, {-half-tube}) rotate(90, 0, 1, 0)">
+    <cut face="end" type="miter" angle="30">
+      <rail len="{demo-len}"/>
+    </cut>
+  </group>
+</part>
+
+<!-- Pure bevel: X-axis tilt. Same rail orientation, but the cut
+     plane tilts top-to-bottom instead of left-to-right. End face
+     leans 30° in elevation. -->
+<part name="bevel-only" color="#44AA66">
+  <group transform="translate({-half-tube}, {demo-y0 + demo-step}, {-half-tube}) rotate(90, 0, 1, 0)">
+    <cut face="end" type="bevel" angle="30">
+      <rail len="{demo-len}"/>
+    </cut>
+  </group>
+</part>
+
+<!-- Compound: miter AND bevel applied to the same end. The face
+     is tilted in two axes simultaneously — the cut you machine for
+     a hopper corner post, a hip rafter at the apex, or any joint
+     where the meeting piece is both skewed in plan and tilted out
+     of plumb. -->
+<part name="compound-cut" color="#AA7744">
+  <group transform="translate({-half-tube}, {demo-y0 + 2 * demo-step}, {-half-tube}) rotate(90, 0, 1, 0)">
+    <cut face="end" type="compound" miter="30" bevel="20">
+      <rail len="{demo-len}"/>
+    </cut>
+  </group>
+</part>

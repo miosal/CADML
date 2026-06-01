@@ -1,0 +1,22 @@
+version 0.1
+units mm
+description "Helical compression spring, 5 mm OD x 0.5 mm wire, 16 active coils on a 2 mm pitch. Exercises <sweep> + <helix> on a profile centred on the helix axis (so the wire wraps around the spring axis rather than spiralling around its own centreline). For a closed-end ground-flat spring the top and bottom coils would be tighter and ground perpendicular; this geometry skips those finishing details."
+
+param od         = 5
+param wire-d     = 0.5
+param coils      = 16
+param pitch      = 2
+
+param mean-r     = {(od - wire-d) / 2}
+
+<part name="spring" color="#a0a0a0">
+  <sweep>
+    <!-- The helix is the path the wire centerline follows: a circle
+         in plan view, advancing by `pitch` along Z each turn. The
+         sweep places the profile (a circle of wire-radius) at every
+         sample along the helix, perpendicular to the local tangent. -->
+    <helix radius="{mean-r}" pitch="{pitch}" turns="{coils}"/>
+    <circle r="{wire-d / 2}"/>
+  </sweep>
+</part>
+

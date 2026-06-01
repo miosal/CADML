@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cadml version="0.1" units="mm">
+  <import src="circular_a.cadml" as="a"/>
+  <part name="b-part">
+    <extrude height="10"><circle r="5"/></extrude>
+  </part>
+</cadml>

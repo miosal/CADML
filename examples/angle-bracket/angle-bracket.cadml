@@ -1,0 +1,52 @@
+version 0.1
+units mm
+description "Right-angle structural bracket with mounting holes — the kind of stamped or extruded steel angle you'd buy by the meter from a hardware catalog. Two legs at 90 degrees, each with three M5 clearance holes on a regular spacing. The L-profile is traced as a path; mounting holes are extrude+circle cuts subtracted via difference. Demonstrates the workhorse pattern: 2D path for the silhouette, plus per-feature cylindrical cuts for fastener clearance."
+
+param leg-l    = 50
+param leg-w    = 25
+param thick    = 4
+param hole-d   = 5.5
+param edge     = 8
+
+<part name="angle-bracket" color="#606878">
+  <difference>
+    <!-- L-profile extruded into a 3D bracket: traces the cross-
+         section in the XY plane (with one leg along +X and the other
+         along +Y), then extrudes leg-w in Z to give the depth. -->
+    <extrude height="{leg-w}">
+      <path d="M 0, 0
+               L {leg-l}, 0
+                 {leg-l}, {thick}
+                 {thick}, {thick}
+                 {thick}, {leg-l}
+                 0, {leg-l}
+                 Z"/>
+    </extrude>
+
+    <!-- Three holes through the horizontal leg (drilled along the
+         Y axis). Each hole is authored as a +Z-extruded cylinder,
+         then the group rotates 90° around X (right-hand rule:
+         takes +Z to -Y), then translates into position. The
+         cylinder is symmetric around its axis, so the sign of the
+         axis direction doesn't matter for a through-hole — it's
+         placed with 1 mm overshoot beyond each face of the leg's
+         thickness so the boolean cuts cleanly. -->
+    <for var="i" from="0" to="2" steps="3">
+      <group transform="translate({edge + (leg-l - 2 * edge) * i / 2}, {thick + 1}, {leg-w / 2}) rotate(90, 1, 0, 0)">
+        <extrude height="{thick + 2}">
+          <circle r="{hole-d / 2}"/>
+        </extrude>
+      </group>
+    </for>
+
+    <!-- Three holes through the vertical leg (drilled in +X). Same
+         pattern, rotated 90 deg around Y instead. -->
+    <for var="i" from="0" to="2" steps="3">
+      <group transform="translate({thick + 1}, {edge + (leg-l - 2 * edge) * i / 2}, {leg-w / 2}) rotate(90, 0, 1, 0)">
+        <extrude height="{thick + 2}">
+          <circle r="{hole-d / 2}"/>
+        </extrude>
+      </group>
+    </for>
+  </difference>
+</part>

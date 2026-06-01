@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cadml version="0.1" units="mm"
+       description="Test fixture: simple cylinder part with ports">
+  <part name="cylinder-part">
+    <param name="r" value="10"/>
+    <param name="h" value="20"/>
+
+    <extrude height="{h}">
+      <circle r="{r}"/>
+    </extrude>
+
+    <port name="top-face" position="0 0 {h}" normal="0 0 1" up="0 1 0"/>
+    <port name="bottom-face" position="0 0 0" normal="0 0 -1" up="0 1 0"/>
+  </part>
+</cadml>

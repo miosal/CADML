@@ -1,0 +1,48 @@
+version 0.1
+units mm
+description "Showcase for the <path> tessellator (M/L/Z): four parts laid out along x demonstrate non-rectangular profiles authored as closed polylines — a hex bolt head, a trapezoidal fork plate, an arrow, and a five-pointed star."
+
+param hex-r   = 12
+param hex-h   = 8
+param plate-h = 4
+param arrow-h = 6
+
+param spacing = 50
+
+<!-- Hex bolt-head profile (6 vertices, M + 5 L). -->
+<part name="hex-bolt-head" color="silver">
+  <group transform="translate(0, 0, 0)">
+    <extrude height="{hex-h}">
+      <path d="M {hex-r},0 L {hex-r * 0.5},{hex-r * 0.866} {-hex-r * 0.5},{hex-r * 0.866} {-hex-r},0 {-hex-r * 0.5},{-hex-r * 0.866} {hex-r * 0.5},{-hex-r * 0.866} Z"/>
+    </extrude>
+  </group>
+</part>
+
+<!-- Trapezoidal fork plate (the rolling-gate fork-L/R that v0.1 had to box-approximate). -->
+<part name="fork-trap" color="Orange">
+  <group transform="translate({spacing}, 0, 0)">
+    <extrude height="{plate-h}">
+      <path d="M -20,0 L 20,0 12,30 -12,30 Z"/>
+    </extrude>
+  </group>
+</part>
+
+<!-- Arrow profile (notched polygon — implicit linetos after M). -->
+<part name="arrow" color="blue">
+  <group transform="translate({spacing * 2}, 0, 0)">
+    <extrude height="{arrow-h}">
+      <path d="M 0,0 L 12,8 6,8 6,20 -6,20 -6,8 -12,8 Z"/>
+    </extrude>
+  </group>
+</part>
+
+<!-- Five-pointed star (relative-coordinate variant — lowercase l + z).
+     Concave 10-vertex profile with 5 reflex inner vertices, exercising
+     ear-clipping while staying CCW and self-non-intersecting. -->
+<part name="star" color="RED">
+  <group transform="translate({spacing * 3}, 0, 0)">
+    <extrude height="{plate-h}">
+      <path d="M 0,20 l -4.7,-13.5 -14.3,-0.3 11.4,-8.7 -4.2,-13.7 11.8,8.2 11.8,-8.2 -4.2,13.7 11.4,8.7 -14.3,0.3 z"/>
+    </extrude>
+  </group>
+</part>

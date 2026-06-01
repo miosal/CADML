@@ -1,0 +1,13 @@
+version 0.1
+units mm
+description "L-bracket extrude — a minimal test of <extrude> over a non-convex (L-shaped) profile traced with a closed <path>. The top and bottom caps are tessellated from the same six-vertex polygon that defines the side walls."
+
+<part name="l-bracket" color="red">
+  <extrude height="7">
+    <path d="M 0,0 L 40,0 40,8 8,8 8,40 0,40 Z"/>
+  </extrude>
+</part>
+
+
+
+

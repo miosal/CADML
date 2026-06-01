@@ -1,0 +1,45 @@
+# CI: build the native libraries + CLI tools + tests on Linux and macOS,
+# and run the full ctest suite. The repo is published as a
+# FetchContent-only library, so a broken native build is the worst-case
+# downstream outcome — this matrix is what catches it.
+
+name: native
+
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tests/**'
+      - 'examples/**'
+      - '.github/workflows/native.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'tests/**'
+      - 'examples/**'
+      - '.github/workflows/native.yml'
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset default
+
+      - name: Build
+        run: cmake --build --preset default --config Debug
+
+      - name: Test
+        run: ctest --preset default --output-on-failure

@@ -1,0 +1,87 @@
+version 0.1
+units mm
+description "Demonstrates <rect rx> rounded corners, <extrude symmetric> centred extrude, and <cut> end-face mitering / beveling / freeform. Seven 30 mm cuboid bases laid out along x at 60 mm spacing — left to right: sharp rect baseline, rect rx=3, rect rx=12 (clamps to half-edge → capsule), extrude symmetric, cut miter on end face, cut compound (miter+bevel), cut freeform (cylinder cutter through a cuboid)."
+
+param size       = 30
+param spacing    = 60
+param half       = {size / 2}
+
+<!-- 1. Sharp baseline (rx=0). Mesh sits at z=[0,size] (default). -->
+<part name="01-sharp" color="#888888">
+  <group transform="translate({-2.5 * spacing}, 0, 0)">
+    <extrude height="{size}">
+      <rect x="{-half}" y="{-half}" width="{size}" height="{size}"/>
+    </extrude>
+  </group>
+</part>
+
+<!-- 2. Rounded corners (rx=3). Same z=[0,size] placement. -->
+<part name="02-rect-rx3" color="#88AABB">
+  <group transform="translate({-1.5 * spacing}, 0, 0)">
+    <extrude height="{size}">
+      <rect x="{-half}" y="{-half}" width="{size}" height="{size}" rx="3"/>
+    </extrude>
+  </group>
+</part>
+
+<!-- 3. rx=12 (greater than half-edge=15 wouldn't fit; 12 is below the
+     clamp but fills most of the corner). The shape pushes toward
+     "rounded square almost circle". -->
+<part name="03-rect-rx12" color="#AACC88">
+  <group transform="translate({-0.5 * spacing}, 0, 0)">
+    <extrude height="{size}">
+      <rect x="{-half}" y="{-half}" width="{size}" height="{size}" rx="12"/>
+    </extrude>
+  </group>
+</part>
+
+<!-- 4. Extrude symmetric. Sits at z=[-size/2, +size/2] - sinks half
+     into the floor instead of standing on it. Compare to part 1. -->
+<part name="04-extrude-symmetric" color="#CCAA88">
+  <group transform="translate({0.5 * spacing}, 0, 0)">
+    <extrude height="{size}" symmetric="true">
+      <rect x="{-half}" y="{-half}" width="{size}" height="{size}" rx="2"/>
+    </extrude>
+  </group>
+</part>
+
+<!-- 5. <cut> miter on the end face: 30 deg slope. The +X edge stays at
+     z=size; the -X edge slopes down. -->
+<part name="05-cut-miter" color="#DD8888">
+  <group transform="translate({1.5 * spacing}, 0, 0)">
+    <cut face="end" type="miter" angle="-30">
+      <extrude height="{size}">
+        <rect x="{-half}" y="{-half}" width="{size}" height="{size}"/>
+      </extrude>
+    </cut>
+  </group>
+</part>
+
+<!-- 6. <cut> compound (miter + bevel). Both end-face axes slope. -->
+<part name="06-cut-compound" color="#88DDDD">
+  <group transform="translate({2.5 * spacing}, 0, 0)">
+    <cut face="end" type="compound" miter="-25" bevel="20">
+      <extrude height="{size}">
+        <rect x="{-half}" y="{-half}" width="{size}" height="{size}"/>
+      </extrude>
+    </cut>
+  </group>
+</part>
+
+<!-- 7. <cut> freeform: 2nd child is a cutter mesh subtracted from the
+     1st. Equivalent to <difference> here, but written as <cut> with
+     type="" to exercise that code path. -->
+<part name="07-cut-freeform" color="#DDDD88">
+  <group transform="translate({3.5 * spacing}, 0, 0)">
+    <cut face="end" type="">
+      <extrude height="{size}">
+        <rect x="{-half}" y="{-half}" width="{size}" height="{size}"/>
+      </extrude>
+      <group transform="translate(0, 0, -1)">
+        <extrude height="{size + 2}">
+          <circle r="8"/>
+        </extrude>
+      </group>
+    </cut>
+  </group>
+</part>

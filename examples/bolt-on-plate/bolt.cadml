@@ -1,0 +1,36 @@
+version 0.1
+units mm
+description "Simple bolt — hex head + cylindrical shaft. One `<port>` named `head-seat` on the underside of the head (where it presses against whatever it's clamping). Mates into a `<port>` whose normal points in the opposite direction (anti-parallel = face-to-face)."
+
+param head-d  = 13
+param head-h  = 5.3
+param shaft-d = 8
+param shaft-l = 30
+
+<part name="bolt" color="#383838">
+  <union>
+    <!-- Hex head: z = 0 to z = head-h. -->
+    <extrude height="{head-h}">
+      <path d="M {head-d / 2 / 0.866}, 0
+               L {head-d / 4 / 0.866},  {head-d / 2}
+                 {-head-d / 4 / 0.866}, {head-d / 2}
+                 {-head-d / 2 / 0.866}, 0
+                 {-head-d / 4 / 0.866}, {-head-d / 2}
+                 {head-d / 4 / 0.866},  {-head-d / 2}
+                 Z"/>
+    </extrude>
+    <!-- Shaft hanging down from z = 0 to z = -shaft-l. -->
+    <group transform="translate(0, 0, {-shaft-l})">
+      <extrude height="{shaft-l}">
+        <circle r="{shaft-d / 2}"/>
+      </extrude>
+    </group>
+  </union>
+
+  <!-- `head-seat` port on the underside of the head. Normal -z
+       (points DOWN, toward where the partner — typically a plate —
+       sits below the head after mating). The shaft hangs further in
+       -z from there. -->
+  <port name="head-seat" position="0 0 0"
+                          normal="0 0 -1" up="1 0 0"/>
+</part>

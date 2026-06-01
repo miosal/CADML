@@ -1,0 +1,20 @@
+CADML — a declarative, parametric CAD-as-code language and reference toolchain.
+Copyright 2026 miosal@cadml.org
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This project bundles or depends on the following third-party works:
+
+* Manifold (CSG library) — Apache License 2.0
+* sol2 (Lua C++ binding library) — MIT License
+* Lua 5.4 — MIT License
+* pugixml (XML parser) — MIT License
+* Clipper2 (polygon clipping / offsetting) — Boost Software License 1.0
+* picosha2 (SHA-256 header-only) — MIT License
+* RapidJSON (JSON parser) — MIT License
+* miniz (ZIP packaging for 3MF output) — MIT License
+* GoogleTest (test framework, optional) — BSD 3-Clause License
+
+Full license texts for these dependencies are included alongside their
+source distributions (in third_party/ when vendored, or fetched via
+your package manager when pulled at configure time).

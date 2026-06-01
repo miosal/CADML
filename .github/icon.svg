@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4DD8C0"/>
+      <stop offset="100%" stop-color="#2BB5A0"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1E9A88"/>
+      <stop offset="100%" stop-color="#167A6C"/>
+    </linearGradient>
+    <linearGradient id="right" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#23A896"/>
+      <stop offset="100%" stop-color="#1A8C7C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Isometric cube -->
+  <!-- Top face -->
+  <polygon points="256,56 436,160 256,264 76,160" fill="url(#top)"/>
+  <!-- Left face -->
+  <polygon points="76,160 256,264 256,456 76,352" fill="url(#left)"/>
+  <!-- Right face -->
+  <polygon points="256,264 436,160 436,352 256,456" fill="url(#right)"/>
+
+  <!-- Angle bracket on right face: < / > -->
+  <!-- < bracket -->
+  <polyline points="310,230 280,280 310,330" fill="none" stroke="#E0FFF8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- / slash -->
+  <line x1="340" y1="225" x2="360" y2="340" stroke="#E0FFF8" stroke-width="12" stroke-linecap="round"/>
+  <!-- > bracket -->
+  <polyline points="385,230 415,280 385,330" fill="none" stroke="#E0FFF8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Subtle edge highlights -->
+  <line x1="256" y1="56" x2="256" y2="264" stroke="#5EECD4" stroke-width="2" opacity="0.5"/>
+  <line x1="256" y1="264" x2="256" y2="456" stroke="#12665A" stroke-width="2" opacity="0.4"/>
+</svg>

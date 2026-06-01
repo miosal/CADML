@@ -1,0 +1,94 @@
+version 0.1
+units mm
+description "Six side-by-side blocks demonstrating the <fillet>, <chamfer>, and <shell> modifiers. Each block is the same 30×30×20 cuboid as the baseline (block 1); blocks 2–6 wrap it in one modifier element each."
+
+param size    = 30
+param height  = 20
+param r       = 3
+param spacing = 50
+param half    = {size / 2}
+param x0      = {-spacing * 2.5}
+
+# A bare extruded cuboid. Re-used as the input geometry for every
+# block so the modifiers operate on the same baseline shape.
+<def name="block">
+  <extrude height="{height}">
+    <rect x="{-half}" y="{-half}" width="{size}" height="{size}"/>
+  </extrude>
+</def>
+
+<!-- 1. Baseline: sharp-edged cuboid. The reference; subsequent
+     blocks modify this exact geometry. -->
+<part name="baseline" color="#808890">
+  <group transform="translate({x0}, 0, 0)">
+    <block/>
+  </group>
+</part>
+
+<!-- 2. All-edge fillet: every convex edge (all 12 on a cuboid)
+     rounded to `r`. The default `select="all"` matches everything;
+     this is the most common "soften the whole thing" use of
+     <fillet>. -->
+<part name="all-fillet" color="#4a90c4">
+  <group transform="translate({x0 + spacing}, 0, 0)">
+    <fillet radius="{r}">
+      <block/>
+    </fillet>
+  </group>
+</part>
+
+<!-- 3. All-edge chamfer: same edges, planar bevels of distance `r`
+     instead of cylindrical rounds. -->
+<part name="all-chamfer" color="#5cae57">
+  <group transform="translate({x0 + spacing * 2}, 0, 0)">
+    <chamfer distance="{r}">
+      <block/>
+    </chamfer>
+  </group>
+</part>
+
+<!-- 4. Top-edges-only fillet: selector-driven. The §13 grammar
+     lets us pick which edges the modifier touches.
+     `edge:position.z=20` matches edges whose midpoint sits at
+     the top face's z (= `height`); the four bottom edges and the
+     four vertical edges stay sharp. The 0.1 selector grammar takes
+     literal numbers only — `{height}` would be rejected. -->
+<part name="top-fillet" color="#c47a4a">
+  <group transform="translate({x0 + spacing * 3}, 0, 0)">
+    <fillet radius="{r}" select="edge:position.z=20">
+      <block/>
+    </fillet>
+  </group>
+</part>
+
+<!-- 5. Composed: inner <fillet> rounds the top edges, outer
+     <chamfer> bevels the bottom edges. Modifiers nest naturally;
+     composition order matters — try swapping them to see how the
+     top corners change shape. -->
+<part name="top-fillet-bottom-chamfer" color="#a05cae">
+  <group transform="translate({x0 + spacing * 4}, 0, 0)">
+    <chamfer distance="{r}" select="edge:position.z=0">
+      <fillet radius="{r}" select="edge:position.z=20">
+        <block/>
+      </fillet>
+    </chamfer>
+  </group>
+</part>
+
+<!-- 6. Hollow shell: <shell> inset-offsets a convex extrude (or
+     revolve) by `thickness`, subtracts the inset, and optionally
+     opens cap faces. `open="end"` removes the top, leaving a cup;
+     `start` opens the bottom; `both` leaves an open-ended tube.
+
+     The 0.1 <shell> wants a literal <extrude> as its direct child
+     (Tier 1 input predicate), so we re-author the cuboid inline
+     rather than instancing the <block> def. -->
+<part name="shell-open-top" color="#c4ae4a">
+  <group transform="translate({x0 + spacing * 5}, 0, 0)">
+    <shell thickness="2" open="end">
+      <extrude height="{height}">
+        <rect x="{-half}" y="{-half}" width="{size}" height="{size}"/>
+      </extrude>
+    </shell>
+  </group>
+</part>

@@ -1,0 +1,47 @@
+version 0.1
+units mm
+description "Caster-wheel assembly — three separate parts (fork, axle, wheel) imported from their own files and placed at the right transforms here. Each top-level `<part>` wraps one imported def in a `<group transform>` so the final output carries three independently-coloured parts: a slicer or 3MF viewer sees fork / axle / wheel as distinct entities, not a fused blob."
+
+import "fork.cadml"
+import "axle.cadml"
+import "wheel.cadml"
+
+# Sizing knobs. Pass-down to each imported part as instance param
+# overrides so changing them here reflows the whole assembly.
+param leg-span    = 50      # distance between the fork's leg outer faces
+param wheel-od    = 45      # wheel outer diameter
+param axle-dia    = 8
+
+# Placement math. The fork sits at identity; the axle runs along the
+# world y-axis through the gap between the legs; the wheel sits on
+# the axle's midpoint with its rotation axis aligned to the axle.
+# Each placement is a `<group transform>` applied to a bare instance.
+#
+# (The ports declared on fork / axle / wheel are CADML's port
+# metadata — they describe canonical attachment points and are
+# consumed by tools like `cadmlmeasure` / `cadmlholes`. They are
+# NOT what positions the parts in this assembly: a top-level
+# multi-part export uses arithmetic transforms, not mate-driven
+# `<assembly>` (which collapses to a single output part).)
+
+<part name="fork" color="#788090">
+  <fork leg-span="{leg-span}" axle-hole-d="{axle-dia + 0.4}"/>
+</part>
+
+<part name="axle" color="#c8c8d0">
+  <!-- axle local +z is its long axis; rotate so +z → world +y, then
+       translate so end-a lands at the left leg's outer face. -->
+  <group transform="translate(0, {-leg-span / 2}, 0) rotate(-90, 1, 0, 0)">
+    <axle length="{leg-span}" dia="{axle-dia}"/>
+  </group>
+</part>
+
+<part name="wheel" color="#2a2a2a">
+  <!-- wheel local +z is its rotation axis; same -90° about world +x
+       aligns it with the axle. The wheel is already symmetric about
+       its hub origin, so no translation is needed — it sits centred
+       on the axle midpoint (world origin). -->
+  <group transform="rotate(-90, 1, 0, 0)">
+    <wheel od="{wheel-od}" hub-bore="{axle-dia + 0.2}"/>
+  </group>
+</part>

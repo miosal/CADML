@@ -1,0 +1,77 @@
+version 0.1
+units mm
+description "Examples of <sweep> + <helix>: a coil spring (sweep of a circle along a helix), a tapered spring, a helical thread cut into a cylindrical rod, and a triple-helix DNA-style structure. Each part exercises a different parameter combination."
+
+param rod-r    = 6
+param rod-h    = 40
+param thread-d = 1.2
+param thread-p = 3
+param thread-t = 10
+
+<!-- 1. Plain coil spring: circle profile swept along a CCW helix. -->
+<part name="coil-spring" color="silver">
+  <group transform="translate(-50, 0, 0)">
+    <sweep>
+      <circle r="0.8"/>
+      <helix radius="6" pitch="4" turns="6"/>
+    </sweep>
+  </group>
+</part>
+
+<!-- 2. Tapered spring (cone-shaped coil) — like a vintage doorbell. -->
+<part name="taper-spring" color="orange">
+  <group transform="translate(-25, 0, 0)">
+    <sweep>
+      <circle r="0.7"/>
+      <helix radius="3" pitch="3" turns="6" taper="0.6"/>
+    </sweep>
+  </group>
+</part>
+
+<!-- 3. Threaded rod: triangle profile swept along a helix and
+     subtracted from a cylinder.
+
+     Profile.x = +d/2 sits outside the rod surface (the cutter
+     base), profile.x = -d/2 sits inside (cutter apex digging in).
+     Profile.y spans ±p/4 so the cutter is half a thread-pitch tall
+     in the axial direction — narrow enough to leave thread crests
+     between cuts. -->
+<part name="threaded-rod" color="silver">
+  <group transform="translate(0, 0, 0)">
+    <difference>
+      <extrude height="{rod-h}">
+        <circle r="{rod-r}"/>
+      </extrude>
+      <sweep>
+        <path d="M -{thread-d/2},0 L {thread-d/2},-{thread-p/4} {thread-d/2},{thread-p/4} Z"/>
+        <helix radius="{rod-r}" pitch="{thread-p}" turns="{thread-t}"/>
+      </sweep>
+    </difference>
+  </group>
+</part>
+
+<!-- 4. DNA-style triple helix: three thin helices wound together. -->
+<part name="dna-helix-1" color="red">
+  <group transform="translate(40, 0, 0)">
+    <sweep>
+      <circle r="0.4"/>
+      <helix radius="3" pitch="6" turns="3"/>
+    </sweep>
+  </group>
+</part>
+<part name="dna-helix-2" color="green">
+  <group transform="translate(40, 0, 0) rotate(120, 0, 0, 1)">
+    <sweep>
+      <circle r="0.4"/>
+      <helix radius="3" pitch="6" turns="3"/>
+    </sweep>
+  </group>
+</part>
+<part name="dna-helix-3" color="blue">
+  <group transform="translate(40, 0, 0) rotate(240, 0, 0, 1)">
+    <sweep>
+      <circle r="0.4"/>
+      <helix radius="3" pitch="6" turns="3"/>
+    </sweep>
+  </group>
+</part>

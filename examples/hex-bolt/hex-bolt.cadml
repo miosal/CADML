@@ -1,0 +1,111 @@
+version 0.1
+units mm
+description "M8 x 50 hex-head cap screw with a sharp-V helical thread cut into the shank and a cone-tapered lead-in tip. Exercises helical-sweep + Boolean-subtract; geometry is stylised, not engineering-grade."
+
+param thread-d        = 8
+param thread-pitch    = 1.25
+param across-flats    = 13
+param head-h          = 5.3
+param shank-l         = 50
+param chamfer-r       = {thread-d * 0.0625}
+
+param tip-chamfer-l   = 1.5
+param tip-r           = 0.5
+
+param thread-tri-h      = {0.866025 * thread-pitch}
+param thread-cut-depth  = {thread-tri-h}
+param thread-overshoot  = 0.1
+param thread-axial-half = {thread-pitch / 2}
+param thread-turns      = {(shank-l - 1) / thread-pitch}
+
+<part name="hex-bolt" color="#9090a0">
+  <union>
+    <!-- Hex head: regular hexagon traced as a path. Across-flats
+         is the inscribed-circle diameter, so the corner-to-center
+         radius is across-flats / (2 cos 30) = across-flats / sqrt 3. -->
+    <extrude height="{head-h}">
+      <path d="M {across-flats / 1.732}, 0
+               L {across-flats / 3.464},  {across-flats / 2}
+                 {-across-flats / 3.464}, {across-flats / 2}
+                 {-across-flats / 1.732}, 0
+                 {-across-flats / 3.464}, {-across-flats / 2}
+                 {across-flats / 3.464},  {-across-flats / 2}
+                 Z"/>
+    </extrude>
+
+    <!-- Top edge chamfer: a small conical frustum lofted between
+         the across-flats circle at the head's top face and a
+         slightly smaller circle one chamfer-r higher, giving the
+         standard ISO 4014 rolled-top profile at this visual scale.
+         `segments` is locked on both circles because <loft> needs
+         matching vertex counts on every section — without the
+         override, the slightly-smaller top circle would adaptively
+         tessellate to a different segment count. -->
+    <group transform="translate(0, 0, {head-h - chamfer-r})">
+      <loft>
+        <sketch plane="xy" origin="0 0 0">
+          <circle r="{across-flats / 2 + 0.1}" segments="64"/>
+        </sketch>
+        <sketch plane="xy" origin="0 0 {chamfer-r}">
+          <circle r="{(across-flats / 2 + 0.1) * 0.92}" segments="64"/>
+        </sketch>
+      </loft>
+    </group>
+
+    <!-- Threaded shank with lead-in chamfer at the tip.
+
+         Body = main cylinder (most of the shank) UNIONED with a
+         short cone (the lead-in tip), all of it then DIFFERENCEd
+         against a single helical V-cutter that runs the full
+         length. Where the cone narrows toward the tip, the cutter
+         passes through air and the thread runs out gradually. -->
+    <group transform="translate(0, 0, {-shank-l})">
+      <difference>
+        <union>
+          <!-- Main cylindrical portion: from the chamfer top to
+               the head. Length = shank - lead-in chamfer. -->
+          <group transform="translate(0, 0, {tip-chamfer-l})">
+            <extrude height="{shank-l - tip-chamfer-l}">
+              <circle r="{thread-d / 2}"/>
+            </extrude>
+          </group>
+
+          <!-- Tip cone (lead-in chamfer): a proper frustum from a
+               1 mm flat at the very tip up to the major diameter.
+               The revolve profile is in (radial, axial) coords spinning
+               around z. -->
+          <revolve axis="z" angle="360">
+            <path d="M 0, 0
+                     L {tip-r}, 0
+                       {thread-d / 2}, {tip-chamfer-l}
+                       0, {tip-chamfer-l}
+                     Z"/>
+          </revolve>
+        </union>
+
+        <!-- 60° V cutter swept the full shank length. The chamfer
+             cone tapers via a revolve, so at the tip end the cutter
+             gradually engages less material as the cone narrows,
+             producing incomplete threads along the tip taper. The
+             cone's bottom region (radius < cutter apex reach
+             = major - H = 2.92 mm) stays intact and forms a
+             smooth bullet-point tip below the partial threads.
+             Profile: x = radial offset from helix path, y = axial.
+             Apex at x = -cut-depth = -H, base at x = +overshoot.
+             Half-base axially = pitch/2 so adjacent cuts butt
+             cleanly at the OD → sharp thread crests. -->
+        <sweep>
+          <helix radius="{thread-d / 2}"
+                 pitch="{thread-pitch}"
+                 turns="{thread-turns}"/>
+          <path d="M {-thread-cut-depth}, 0
+                   L  {thread-overshoot}, {-thread-axial-half}
+                      {thread-overshoot},  {thread-axial-half}
+                   Z"/>
+        </sweep>
+      </difference>
+    </group>
+  </union>
+</part>
+
+

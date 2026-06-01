@@ -1,0 +1,11 @@
+version 0.1
+units mm
+description "Five-pointed star — concave 10-vertex profile written with relative-coordinate <path> (lowercase l + z). The profile has 5 reflex (inner) vertices and 5 convex (outer) ones; the tessellator handles ear-clipping over the full concave polygon."
+
+<part name="star" color="blue">
+  <extrude height="5">
+    <path d="M 0,20 l -4.7,-13.5 -14.3,-0.3 11.4,-8.7 -4.2,-13.7 11.8,8.2 11.8,-8.2 -4.2,13.7 11.4,8.7 -14.3,0.3 z"/>
+  </extrude>
+</part>
+
+

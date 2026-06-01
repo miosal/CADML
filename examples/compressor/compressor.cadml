@@ -1,0 +1,75 @@
+version 0.1
+units mm
+description "Centrifugal turbo compressor wheel: revolved hub + 6 main blades + 6 splitter blades, all parametric. Each blade is a polyhedral loft over 20 stations along the meridional curve, with the airfoil cross-section, blade height, blade angle (backsweep), and thickness all computed from Lua functions in compressor.lua. Hub is a revolve of a Lua-generated meridional path; blades use <for>-unrolled sketches inside <loft>."
+
+import "compressor.lua"
+
+param bore-r        = 4
+param hub-inlet-r   = 8
+param exducer-r     = 26
+param inducer-tip-r = 20
+param height        = 25
+param back-t        = 1.5
+param overshoot     = 1
+
+<!-- Each station sets normal = (hub_tx, 0, hub_tz), the negated
+     meridional tangent in the (radial, axial) plane. The flat
+     engine then computes up = +Y (kept orthogonal to normal) and
+     right = up × normal, so right is the meridional perpendicular
+     pointing OUTWARD from the hub surface. Blade profile.x extends
+     along right (hub-to-shroud span), profile.y along up (tangential
+     thickness), and the blade follows the hub curve cleanly with
+     its root seated on the hub surface at every station. -->
+<def name="main-blade">
+  <loft>
+    <for var="t" from="0" to="1" steps="20">
+      <sketch plane="xy" origin="{compressor.hub_r(t)} 0 {compressor.hub_z(t)}"
+              rotation="{compressor.blade_beta(t)}"
+              normal="{compressor.hub_tx(t)} 0 {compressor.hub_tz(t)}">
+        <path d="{compressor.blade_section(compressor.blade_h(t), compressor.blade_t(t))}"/>
+      </sketch>
+    </for>
+  </loft>
+</def>
+
+<def name="splitter-blade">
+  <loft>
+    <for var="t" from="0.35" to="1" steps="14">
+      <sketch plane="xy" origin="{compressor.hub_r(t)} 0 {compressor.hub_z(t)}"
+              rotation="{compressor.blade_beta(t)}"
+              normal="{compressor.hub_tx(t)} 0 {compressor.hub_tz(t)}">
+        <path d="{compressor.blade_section(compressor.blade_h(t), compressor.blade_t(t))}"/>
+      </sketch>
+    </for>
+  </loft>
+</def>
+
+<part name="compressor-wheel" color="#A0A0B0">
+  <difference>
+    <union>
+      <!-- Revolved hub: concave meridional curve from Lua. -->
+      <revolve axis="z" angle="360">
+        <path d="{compressor.hub_profile()}"/>
+      </revolve>
+
+      <!-- 6 main blades around the axis. -->
+      <pattern type="circular" count="6" axis="z">
+        <main-blade/>
+      </pattern>
+
+      <!-- 6 splitter blades, offset 30 deg between main blades. -->
+      <pattern type="circular" count="6" axis="z">
+        <group transform="rotate(30, 0, 0, 1)">
+          <splitter-blade/>
+        </group>
+      </pattern>
+    </union>
+
+    <!-- Shaft bore. -->
+    <group transform="translate(0, 0, {-(back-t + overshoot)})">
+      <extrude height="{height + back-t + overshoot * 2 + 4}">
+        <circle r="{bore-r}"/>
+      </extrude>
+    </group>
+  </difference>
+</part>

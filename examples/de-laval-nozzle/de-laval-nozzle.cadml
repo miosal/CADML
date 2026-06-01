@@ -1,0 +1,135 @@
+version 0.1
+units mm
+description "De Laval converging-diverging nozzle for a small bipropellant upper-stage motor. 80 mm chamber, 24 mm throat, 150 mm bell exit (expansion area-ratio ≈ 39:1, vacuum-class). The bell profile is an approximate Rao 80% contour traced as a parametric polyline along the divergent section; the convergent half is a conic frustum from chamber radius to throat radius. The mounting flange at the injector end carries an 8-bolt PCD96 pattern. Single revolved blank, hollowed by a second revolve of the inner gas-path profile, with the bolt holes punched through the flange. One <part>."
+
+# ── Chamber / throat / exit ─────────────────────────────────────────
+param chamber-d   = 80          # combustion chamber ID
+param throat-d    = 24          # sonic throat
+param exit-d      = 150         # bell exit ID
+param chamber-l   = 35          # cylindrical chamber length
+param conv-l      = 22          # convergent (chamber → throat)
+param div-l       = 120         # divergent (throat → exit, bell)
+
+# ── Wall + flange ───────────────────────────────────────────────────
+param wall-t      = 4           # nominal wall thickness
+param throat-t    = 6           # extra material around the throat
+param flange-d    = 110         # injector flange OD
+param flange-t    = 8           # flange thickness
+param bolt-count  = 8
+param bolt-d      = 6           # clearance hole for M5 bolts
+param bolt-pcd    = 96          # bolt pitch-circle diameter
+param rev-segs    = 128         # rotational facets — high for hero renders
+
+# ── Derived ─────────────────────────────────────────────────────────
+param r-cham      = {chamber-d / 2}
+param r-throat    = {throat-d / 2}
+param r-exit      = {exit-d / 2}
+param r-flange    = {flange-d / 2}
+param z-throat    = {chamber-l + conv-l}
+param z-exit      = {chamber-l + conv-l + div-l}
+
+# Bell curve. The divergent contour follows r(t) = r-throat +
+# (r-exit - r-throat) * f(t), with f(t) = 1 - (1 - t)^2 — a
+# quadratic that flares fast off the throat and levels into the
+# exit plane. Sampled at 9 points (t = 0, 1/8, 2/8, … 1) so the
+# revolve's surface is smooth enough for renders without the
+# vertex count blowing up.
+#
+# Pre-computed bell radii so the path stays readable. Format:
+# r-bN is the radius at t = N/8 along the divergent section.
+param r-b0  = {r-throat}
+param r-b1  = {r-throat + (r-exit - r-throat) * 0.234}    # 1 - (7/8)^2
+param r-b2  = {r-throat + (r-exit - r-throat) * 0.438}    # 1 - (6/8)^2
+param r-b3  = {r-throat + (r-exit - r-throat) * 0.609}    # 1 - (5/8)^2
+param r-b4  = {r-throat + (r-exit - r-throat) * 0.750}    # 1 - (4/8)^2
+param r-b5  = {r-throat + (r-exit - r-throat) * 0.859}    # 1 - (3/8)^2
+param r-b6  = {r-throat + (r-exit - r-throat) * 0.938}    # 1 - (2/8)^2
+param r-b7  = {r-throat + (r-exit - r-throat) * 0.984}    # 1 - (1/8)^2
+param r-b8  = {r-exit}
+param z-b1  = {z-throat + div-l * 0.125}
+param z-b2  = {z-throat + div-l * 0.250}
+param z-b3  = {z-throat + div-l * 0.375}
+param z-b4  = {z-throat + div-l * 0.500}
+param z-b5  = {z-throat + div-l * 0.625}
+param z-b6  = {z-throat + div-l * 0.750}
+param z-b7  = {z-throat + div-l * 0.875}
+
+# Outer-wall radii — offset outward from the gas path by wall-t,
+# with a thicker collar around the throat (the highest-stress
+# region) tapering back to wall-t at the exit plane.
+param ro-cham   = {r-flange}                         # flush with flange face
+param ro-throat = {r-throat + throat-t}
+param ro-exit   = {r-exit + wall-t}
+param ro-b1     = {r-b1 + throat-t * 0.85}
+param ro-b2     = {r-b2 + throat-t * 0.65}
+param ro-b3     = {r-b3 + throat-t * 0.45}
+param ro-b4     = {r-b4 + throat-t * 0.30}
+param ro-b5     = {r-b5 + wall-t * 1.4}
+param ro-b6     = {r-b6 + wall-t * 1.2}
+param ro-b7     = {r-b7 + wall-t * 1.1}
+
+<part name="nozzle" color="#b8732a">
+  <difference>
+    <!-- Outer blank: revolved meridional profile that wraps the
+         entire nozzle from the injector flange down past the bell
+         exit. The contour starts at the centreline at z=0, climbs
+         to the flange OD, runs flat across the flange face,
+         tapers down into the chamber wall, sweeps through the
+         throat collar, follows the bell contour back out to the
+         exit plane, then closes across the exit and back along
+         the axis. -->
+    <revolve axis="z" angle="360" segments="{rev-segs}">
+      <path d="M 0, 0
+               L {r-flange}, 0
+                 {r-flange}, {flange-t}
+                 {ro-cham}, {flange-t}
+                 {ro-cham}, {chamber-l}
+                 {ro-throat}, {z-throat}
+                 {ro-b1}, {z-b1}
+                 {ro-b2}, {z-b2}
+                 {ro-b3}, {z-b3}
+                 {ro-b4}, {z-b4}
+                 {ro-b5}, {z-b5}
+                 {ro-b6}, {z-b6}
+                 {ro-b7}, {z-b7}
+                 {ro-exit}, {z-exit}
+                 0, {z-exit}
+                 Z"/>
+    </revolve>
+
+    <!-- Gas path: the inner cavity. Another revolved meridional
+         profile tracing the bore from injector face down through
+         the chamber, the converging conic, the throat, and out
+         the bell contour. Slightly oversized in z at both ends
+         so the boolean cleanly cuts the flat faces. -->
+    <revolve axis="z" angle="360" segments="{rev-segs}">
+      <path d="M 0, -1
+               L {r-cham}, -1
+                 {r-cham}, {chamber-l}
+                 {r-throat}, {z-throat}
+                 {r-b1}, {z-b1}
+                 {r-b2}, {z-b2}
+                 {r-b3}, {z-b3}
+                 {r-b4}, {z-b4}
+                 {r-b5}, {z-b5}
+                 {r-b6}, {z-b6}
+                 {r-b7}, {z-b7}
+                 {r-exit}, {z-exit + 1}
+                 0, {z-exit + 1}
+                 Z"/>
+    </revolve>
+
+    <!-- Injector bolt circle. Eight clearance holes patterned
+         around the flange. Each hole is a small cylindrical
+         extrude punched through the flange thickness; <pattern>
+         duplicates it around the z-axis. Slightly oversized in z
+         so it cuts both flange faces cleanly. -->
+    <pattern type="circular" count="{bolt-count}" axis="z" angle="360">
+      <group transform="translate({bolt-pcd / 2}, 0, -1)">
+        <extrude height="{flange-t + 2}">
+          <circle r="{bolt-d / 2}"/>
+        </extrude>
+      </group>
+    </pattern>
+  </difference>
+</part>

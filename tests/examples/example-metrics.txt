@@ -1,0 +1,33 @@
+# Geometric-invariant manifest for the example corpus, read by the
+# cadml_examples tolerance test (test_examples_metrics.cpp).
+#
+# Unlike a byte/hash golden, these invariants survive compiler,
+# optimization-level, and platform differences in Manifold's mesh
+# output — only a real geometry change moves them. Regenerate with
+# cadml_regen_example_metrics when a change to the engine is intended.
+#
+# Format: <example-name> <parts> <volume_mm3> <dx> <dy> <dz>
+
+angle-bracket 1 9315.567808 50.0000 50.0000 25.0000
+bolt-on-plate 1 11532.652420 40.0000 40.0000 35.3000
+caster-wheel 3 41394.543167 60.0000 60.0000 58.5000
+compression-spring 1 43.042513 5.0000 5.0000 32.5000
+compressor 1 17313.355306 54.4073 54.4073 28.5000
+de-laval-nozzle 1 376438.665009 158.0000 158.0000 177.0000
+demo-l-bracket 1 4032.000000 40.0000 40.0000 7.0000
+demo-star 1 2355.000000 38.0000 36.2000 5.0000
+demo-svg-curves 4 7387.115267 203.6812 57.0000 4.0000
+demo-svg-import 3 7369.250629 159.0000 50.0000 5.0000
+demo-sweep 6 5238.658585 100.2000 14.0000 40.7988
+flange 1 104232.146176 107.9950 107.9975 16.0000
+gear 1 5525.754937 35.3578 35.3578 8.0000
+hex-bolt 1 2689.125233 15.0115 13.2000 55.3000
+hex-nut 1 661.205147 15.0115 13.0000 6.5500
+mitered-frame 7 467712.871037 430.0000 360.0000 360.0000
+peg-in-hole 2 13939.400000 30.0000 30.0000 20.0000
+propeller 1 1694.439560 111.9291 96.9503 6.7865
+showcase-cut-rx-symmetric 7 159428.168903 390.0000 30.0000 45.0000
+showcase-fillet-chamfer 6 92949.086225 280.0000 30.0000 20.0000
+showcase-hull 4 30233.104338 235.0000 32.0000 30.5000
+showcase-path 4 10156.896000 181.0000 46.2000 8.0000
+v-belt-pulley 1 33813.988449 60.0000 60.0000 18.0000

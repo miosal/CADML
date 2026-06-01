@@ -1,0 +1,82 @@
+version 0.1
+units mm
+description "Caster fork — U-bracket with a flat mounting plate on top and two legs that hang down to carry the axle. Local frame: +z is up, the axle line runs along the y-axis at z = 0 (the BOTTOM of the legs), the legs extend upward from z = 0 to z = leg-h, the mounting plate sits on top of the legs (z = leg-h to leg-h + plate-t). Three ports: `mount` (top of the plate, attaches to the furniture this caster carries) and `axle-l` / `axle-r` (the two axle-hole faces on the outside of the legs)."
+
+param plate-x       = 60     # mounting plate, x-span
+param plate-y       = 60     # mounting plate, y-span
+param plate-t       = 4      # plate thickness
+param leg-x         = 14     # leg width (along x)
+param leg-thick     = 5      # leg thickness (along y, single leg)
+param leg-span      = 50     # outside-to-outside distance between leg outer faces (along y)
+param leg-h         = 32     # how tall the legs are (axle line to underside of plate)
+param axle-hole-d   = 8.4    # axle hole diameter (axle dia + clearance)
+param plate-bolt-d  = 5      # 4 mounting bolt holes through the plate corners
+param plate-bolt-pcd = 44
+
+# Internal helpers — bottom of plate / top of plate z values.
+param plate-bot-z = {leg-h}
+param plate-top-z = {leg-h + plate-t}
+
+<part name="fork" color="#788090">
+  <difference>
+    <union>
+      <!-- Mounting plate sits on TOP of the legs. -->
+      <group transform="translate(0, 0, {plate-bot-z})">
+        <extrude height="{plate-t}">
+          <rect x="{-plate-x / 2}" y="{-plate-y / 2}"
+                width="{plate-x}" height="{plate-y}" rx="4"/>
+        </extrude>
+      </group>
+
+      <!-- Two legs rising from the axle line (z=0) up to the plate.
+           Each leg is a rectangular slab on the outside of leg-span/2
+           in y; both are unrolled by a <for> over `side` ∈ {-1, +1}. -->
+      <for var="side" values="-1 1">
+        <group transform="translate(0, {side * (leg-span - leg-thick) / 2}, 0)">
+          <extrude height="{leg-h}">
+            <rect x="{-leg-x / 2}" y="{-leg-thick / 2}"
+                  width="{leg-x}" height="{leg-thick}" rx="1.5"/>
+          </extrude>
+        </group>
+      </for>
+    </union>
+
+    <!-- Axle hole through both legs at z=0 (the axle line). One
+         cylinder cut from y = -(leg-span/2 + 1) to y = +(leg-span/2 + 1).
+         Wrapped in a 90°-X rotation so the cylinder lies along y. -->
+    <group transform="rotate(90, 1, 0, 0) translate(0, 0, {-leg-span / 2 - 1})">
+      <extrude height="{leg-span + 2}">
+        <circle r="{axle-hole-d / 2}"/>
+      </extrude>
+    </group>
+
+    <!-- Four mounting-bolt holes through the plate corners, on a
+         circular pattern. Authors who want a different bolt-pattern
+         shape (rectangular, etc.) can replace this block. -->
+    <pattern type="circular" count="4" axis="z">
+      <group transform="translate({plate-bolt-pcd / 2}, 0, {plate-bot-z - 1})">
+        <extrude height="{plate-t + 2}">
+          <circle r="{plate-bolt-d / 2}"/>
+        </extrude>
+      </group>
+    </pattern>
+  </difference>
+
+  <!-- Top of the mounting plate. Whatever the caster carries sits
+       in +z from here, so the port normal is +z (the mating partner's
+       direction). A partner port aligned for face-to-face mating
+       declares normal -z, so the two ports are anti-parallel and the
+       mate becomes a pure translation. -->
+  <port name="mount"  position="0 0 {plate-top-z}"
+                       normal="0 0 1" up="1 0 0"/>
+
+  <!-- Axle holes on the legs. axle-l's mating partner (the axle body)
+       sits in +y from this port (inside the fork, between the legs),
+       so normal +y. axle-r symmetrically points -y. Mating partners
+       therefore have anti-parallel normals — see the axle ports for
+       the matching end-a / end-b declarations. -->
+  <port name="axle-l" position="0 {-leg-span / 2} 0"
+                       normal="0 1 0"  up="0 0 1"/>
+  <port name="axle-r" position="0 {leg-span / 2} 0"
+                       normal="0 -1 0" up="0 0 1"/>
+</part>

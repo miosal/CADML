@@ -1,0 +1,46 @@
+version 0.1
+units mm
+description "Caster wheel — solid disc with a hub bore. One port (`hub`) at the wheel's geometric centre, used to mount the wheel on an axle. Local frame: rotation axis along z, wheel symmetric about z = 0 (spans z = -thickness/2 to z = +thickness/2) so port-mating places it centred on the axle."
+
+param od        = 45
+param hub-bore  = 8.2
+param thickness = 16
+# Slightly tapered profile: the running surface is narrower than the
+# wheel's overall thickness so the contact patch on the floor is a
+# crisp line, not the full tread. Lofted between two coaxial circles.
+param tread-d   = 38
+
+<part name="wheel" color="#2a2a2a">
+  <difference>
+    <!-- Loft three coaxial circles to produce a slightly barrel-
+         shaped wheel (narrow tread on the running surface, wider
+         in the middle). `segments` is locked to 64 on every section
+         because <loft> requires every section to have the same
+         vertex count — without the override, each circle would
+         tessellate adaptively to a different segment count and the
+         loft would error. -->
+    <loft>
+      <sketch plane="xy" origin="0 0 {-thickness / 2}">
+        <circle r="{tread-d / 2}" segments="64"/>
+      </sketch>
+      <sketch plane="xy" origin="0 0 0">
+        <circle r="{od / 2}" segments="64"/>
+      </sketch>
+      <sketch plane="xy" origin="0 0 {thickness / 2}">
+        <circle r="{tread-d / 2}" segments="64"/>
+      </sketch>
+    </loft>
+    <!-- Hub bore through the rotation axis. Overshoots both faces by
+         1 mm so the boolean cuts cleanly. -->
+    <group transform="translate(0, 0, {-thickness / 2 - 1})">
+      <extrude height="{thickness + 2}">
+        <circle r="{hub-bore / 2}"/>
+      </extrude>
+    </group>
+  </difference>
+
+  <!-- Hub at the wheel's centre. Normal +z aligns the wheel's
+       rotation axis with the axle's axis when mated to a port whose
+       normal is -z (e.g., axle's `mid`). -->
+  <port name="hub" position="0 0 0" normal="0 0 1" up="1 0 0"/>
+</part>

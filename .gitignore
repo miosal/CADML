@@ -1,0 +1,61 @@
+# CADML — build artefacts and per-machine state.
+#
+# Source-of-truth tree only. Anything regenerable lives under build/.
+
+# Local environment / secrets — never commit
+.env
+.env.*
+
+# CMake build output
+build/
+out/
+
+# CMake per-user / per-machine state
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
+cmake_install.cmake
+compile_commands.json
+*.tlog
+
+# IDE local state
+.vs/
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.user
+
+# AI / agent tool scratch directories
+.claude/
+.codex/
+.openai/
+.cursor/
+.continue/
+.aider*
+.codeium/
+.copilot/
+.pi/
+
+# clangd / ccls cache
+.cache/
+.ccls-cache/
+compile_flags.txt
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor backup / patch leftovers
+*.bak
+*~
+*.orig
+*.rej
+
+
+# Local test scratchpad — do not check in regenerated mesh fixtures.
+tests/output/
+
+# Ad-hoc exporter scratch dumps (regenerable via cadml3mf over examples/).
+3mf_output/

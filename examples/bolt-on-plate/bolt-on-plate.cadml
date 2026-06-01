@@ -1,0 +1,22 @@
+version 0.1
+units mm
+description "Two parts (plate, bolt) mated via `<port>` ports inside an `<assembly>`. The bolt's `head-seat` port mates the plate's `hole` port — anti-parallel normals make the mate a pure face-to-face translation: the bolt's head lands flush on the plate's top face and the shaft hangs through the hole. The single output `<part name=\"bolt-on-plate\">` is what `<assembly>` produces; tools that need a separately-coloured multi-part deliverable should use the top-level-`<part>`-wrappers pattern (see `examples/caster-wheel/`) instead."
+
+import "plate.cadml"
+import "bolt.cadml"
+
+<assembly name="bolt-on-plate">
+  <!-- Nesting expresses parent → child mating:
+         plate (root, at identity)
+         └── bolt mates its `head-seat` to plate's `hole`
+
+       After the mate: plate.hole and bolt.head-seat coincide in
+       world coords. plate.hole is at world (0, 0, plate.thick=6),
+       normal +z. bolt.head-seat is at bolt-local (0, 0, 0), normal
+       -z. Anti-parallel → pure translation: bolt's local origin
+       lands at world z=6, head spans z=6..(6+head-h), shaft hangs
+       z=6 down to z=6-shaft-l. -->
+  <plate>
+    <bolt at="hole" port="head-seat"/>
+  </plate>
+</assembly>
