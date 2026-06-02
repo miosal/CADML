@@ -353,7 +353,7 @@ param base-bevel  = 2
 export const EXAMPLES: Example[] = [
   {
     id:    'compressor',
-    title: 'Centrifugal compressor',
+    title: 'Compressor',
     blurb: 'Revolved hub plus six main and six splitter blades, each a polyhedral loft of Lua-computed airfoil sections.',
     files: [
       { path: 'compressor.cadml', contents: COMPRESSOR_CADML },
@@ -363,7 +363,7 @@ export const EXAMPLES: Example[] = [
   },
   {
     id:    'caster-wheel',
-    title: 'Caster wheel',
+    title: 'Castor Wheel',
     blurb: 'Fork, axle, and wheel emitted as three top-level <part> elements from one source. The wheel uses <loft> across three coaxial circles for a tread profile.',
     files: [
       { path: 'caster-wheel.cadml', contents: CASTER_WHEEL_CADML },
