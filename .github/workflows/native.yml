@@ -27,8 +27,14 @@ jobs:
       - name: Configure
         run: cmake --preset default
 
+      # --config / --build-config matter only on multi-config generators
+      # (Visual Studio on Windows); they are no-ops on the single-config
+      # Makefile generators used on Linux/macOS, where CMAKE_BUILD_TYPE
+      # from the preset (RelWithDebInfo) already fixes the configuration.
+      # Without a matching --build-config, ctest on Windows reports
+      # "Test not available without configuration" and runs nothing.
       - name: Build
-        run: cmake --build --preset default --config Debug
+        run: cmake --build --preset default --config RelWithDebInfo
 
       - name: Test
-        run: ctest --preset default --output-on-failure
+        run: ctest --preset default --output-on-failure --build-config RelWithDebInfo
