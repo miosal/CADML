@@ -715,11 +715,18 @@ void validate_param_overrides(const Document& doc,
             std::optional<double> max;
         };
         std::unordered_map<std::string, DefParam> def_params;
+        // Declaration order matters: a param default may reference an
+        // earlier param (e.g. `plate-top-z = {leg-h + plate-t}`), so the
+        // defaults must be evaluated in source order, not the arbitrary
+        // hash order of `def_params`. Keep a parallel ordered list of the
+        // param names for the evaluation pass below.
+        std::vector<std::string> def_param_order;
         for (auto& child : doc.children(def_idx)) {
             if (child.dead) continue;
             if (child.type != NodeType::Param) continue;
             const auto& pa = std::get<ParamAttrs>(child.attrs);
-            def_params.emplace(pa.name, DefParam{pa.value_expr, pa.min, pa.max});
+            if (def_params.emplace(pa.name, DefParam{pa.value_expr, pa.min, pa.max}).second)
+                def_param_order.push_back(pa.name);
         }
 
         // Build the eval scope: entry params, then def's own params (so
@@ -744,7 +751,8 @@ void validate_param_overrides(const Document& doc,
                 errors.push_back(std::move(ce));
             }
         }
-        for (const auto& [name, dp] : def_params) {
+        for (const auto& name : def_param_order) {
+            const auto& dp = def_params.at(name);
             std::vector<ExpressionError> errs;
             if (auto v = e.evaluate_number(dp.value_expr, n.source, errs)) {
                 e.set_param(name, *v);
