@@ -92,22 +92,22 @@ struct LuaRuntime::Impl {
             sol::lib::table);
 
         // Defence in depth — clobber unsafe globals exposed by `base`.
-        lua["dofile"]         = sol::nil;
-        lua["loadfile"]       = sol::nil;
-        lua["load"]           = sol::nil;
-        lua["loadstring"]     = sol::nil;
-        lua["require"]        = sol::nil;
-        lua["collectgarbage"] = sol::nil;
-        lua["rawget"]         = sol::nil;
-        lua["rawset"]         = sol::nil;
-        lua["rawequal"]       = sol::nil;
+        lua["dofile"]         = sol::lua_nil;
+        lua["loadfile"]       = sol::lua_nil;
+        lua["load"]           = sol::lua_nil;
+        lua["loadstring"]     = sol::lua_nil;
+        lua["require"]        = sol::lua_nil;
+        lua["collectgarbage"] = sol::lua_nil;
+        lua["rawget"]         = sol::lua_nil;
+        lua["rawset"]         = sol::lua_nil;
+        lua["rawequal"]       = sol::lua_nil;
 
         // `string.dump` returns a function's compiled bytecode. It
         // does not by itself escape the sandbox (since `load` /
         // `loadstring` are already nilled out), but it pairs with any
         // future Lua-version regression in the bytecode loader to
         // become a sandbox escape. Cheaper to remove than to defend.
-        lua["string"]["dump"] = sol::nil;
+        lua["string"]["dump"] = sol::lua_nil;
 
         sol::table cadml = lua.create_named_table("cadml");
 
@@ -334,7 +334,7 @@ std::vector<LuaError> LuaRuntime::load_module(
             errors.push_back({
                 std::string("Lua module `") + std::string(alias) + "`: " +
                 err.what(), source_range });
-            impl_->lua["__cadml_pre"] = sol::nil;
+            impl_->lua["__cadml_pre"] = sol::lua_nil;
             return errors;
         }
 
