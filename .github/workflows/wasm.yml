@@ -5,15 +5,13 @@
 
 name: wasm
 
+# Run on every push and pull request (no path filters) plus on every
+# published release.
 on:
   push:
-    paths:
-      - 'src/**'
-      - '.github/workflows/wasm.yml'
   pull_request:
-    paths:
-      - 'src/**'
-      - '.github/workflows/wasm.yml'
+  release:
+    types: [published]
 
 jobs:
   build-and-test:

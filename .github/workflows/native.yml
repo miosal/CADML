@@ -5,25 +5,14 @@
 
 name: native
 
+# Run on every push and pull request (no path filters — a green build
+# is a repo-wide invariant, and path-filtered runs silently skipped
+# changes that did affect the build) plus on every published release.
 on:
   push:
-    paths:
-      - 'src/**'
-      - 'cmake/**'
-      - 'CMakeLists.txt'
-      - 'CMakePresets.json'
-      - 'tests/**'
-      - 'examples/**'
-      - '.github/workflows/native.yml'
   pull_request:
-    paths:
-      - 'src/**'
-      - 'cmake/**'
-      - 'CMakeLists.txt'
-      - 'CMakePresets.json'
-      - 'tests/**'
-      - 'examples/**'
-      - '.github/workflows/native.yml'
+  release:
+    types: [published]
 
 jobs:
   build-and-test:
