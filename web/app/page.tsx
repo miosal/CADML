@@ -9,51 +9,51 @@ export default function Home() {
   return (
     <div className="min-h-full flex flex-col">
       <header className="border-b border-zinc-200">
-        <div className="mx-auto max-w-7xl px-6 h-14 flex items-center justify-between">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="" aria-hidden className="w-5 h-5" />
             <span className="font-semibold tracking-tight">CADML</span>
           </div>
-          <nav className="flex items-center gap-5 text-sm text-zinc-600">
+          <nav className="flex items-center gap-3 sm:gap-5 text-sm text-zinc-600">
             <a className="inline-flex items-center gap-1 hover:text-zinc-900" href={SPEC_URL}>
               <span>Spec</span>
-              <ExternalLinkIcon className="w-3 h-3 text-zinc-400" />
+              <ExternalLinkIcon className="w-3 h-3 text-zinc-400 hidden sm:inline" />
             </a>
             <a className="inline-flex items-center gap-1 hover:text-zinc-900" href={EXAMPLES_URL}>
               <span>Examples</span>
-              <ExternalLinkIcon className="w-3 h-3 text-zinc-400" />
+              <ExternalLinkIcon className="w-3 h-3 text-zinc-400 hidden sm:inline" />
             </a>
-            <a className="inline-flex items-center gap-1.5 hover:text-zinc-900" href={REPO_URL}>
+            <a className="inline-flex items-center gap-1.5 hover:text-zinc-900" href={REPO_URL} aria-label="GitHub">
               <GitHubIcon className="w-4 h-4" />
-              <span>GitHub</span>
-              <ExternalLinkIcon className="w-3 h-3 text-zinc-400" />
+              <span className="hidden sm:inline">GitHub</span>
+              <ExternalLinkIcon className="w-3 h-3 text-zinc-400 hidden sm:inline" />
             </a>
           </nav>
         </div>
       </header>
 
       <main className="flex-1">
-        <section className="mx-auto max-w-7xl px-6 pt-16 pb-24 md:pt-24 md:pb-32">
-          <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-10 md:gap-12 items-start">
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 pt-10 pb-16 md:pt-24 md:pb-32">
+          <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-8 md:gap-12 items-start">
             <div>
-              <h1 className="text-5xl md:text-6xl font-semibold tracking-tight">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight">
                 CADML
               </h1>
               <p className="mt-2 text-base text-zinc-500">
                 Computer-Aided Design Markup Language
               </p>
-              <p className="mt-6 text-xl text-zinc-700 leading-snug">
+              <p className="mt-5 md:mt-6 text-lg md:text-xl text-zinc-700 leading-snug">
                 A declarative XML-based language for parametric
                 solid modelling.
               </p>
-              <p className="mt-4 text-base text-zinc-500 leading-relaxed">
+              <p className="mt-4 text-sm md:text-base text-zinc-500 leading-relaxed">
                 A C++ reference toolchain compiles{' '}
                 <code className="text-[0.9em] px-1 py-0.5 bg-zinc-100 rounded">.cadml</code>{' '}
                 to triangle meshes and exports STL, glTF, or 3MF. The
                 same pipeline runs on this page as WebAssembly.
               </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3 text-sm">
+              <div className="mt-6 md:mt-8 flex flex-wrap items-center gap-2 sm:gap-3 text-sm">
                 <a
                   href={SPEC_URL}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-zinc-900 text-white hover:bg-zinc-800"
@@ -88,7 +88,7 @@ export default function Home() {
 
         <Divider />
 
-        <section id="what" className="mx-auto max-w-3xl px-6 py-20">
+        <section id="what" className="mx-auto max-w-3xl px-4 sm:px-6 py-12 md:py-20">
           <h2 className="text-2xl font-semibold tracking-tight">What CADML is</h2>
           <div className="mt-6 space-y-4 text-zinc-700 leading-relaxed">
             <p>
@@ -113,7 +113,7 @@ export default function Home() {
 
         <Divider />
 
-        <section id="why" className="mx-auto max-w-3xl px-6 py-20">
+        <section id="why" className="mx-auto max-w-3xl px-4 sm:px-6 py-12 md:py-20">
           <h2 className="text-2xl font-semibold tracking-tight">
             Why another CAD DSL?
           </h2>
@@ -145,20 +145,20 @@ export default function Home() {
 
         <Divider />
 
-        <section id="compared" className="mx-auto max-w-3xl px-6 py-20">
+        <section id="compared" className="mx-auto max-w-3xl px-4 sm:px-6 py-12 md:py-20">
           <h2 className="text-2xl font-semibold tracking-tight">
             Compared to existing tools
           </h2>
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+          <div className="mt-6 -mx-4 sm:mx-0 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-xs sm:text-sm border-collapse">
               <thead>
                 <tr className="text-left border-b border-zinc-200 text-xs uppercase tracking-wider">
-                  <th className="py-2 pr-3 font-medium text-zinc-500">Tool</th>
+                  <th className="py-2 px-3 sm:pl-4 font-medium text-zinc-500">Tool</th>
                   <th className="py-2 pr-3 font-medium text-zinc-500">Source</th>
                   <th className="py-2 pr-3 font-medium text-zinc-500">Engine</th>
                   <th className="py-2 pr-3 font-medium text-zinc-500">Kernel</th>
                   <th className="py-2 pr-3 font-medium text-zinc-500">Solver</th>
-                  <th className="py-2 font-medium text-zinc-500">GUI</th>
+                  <th className="py-2 pr-3 sm:pr-0 font-medium text-zinc-500">GUI</th>
                 </tr>
               </thead>
               <tbody className="align-top">
@@ -225,7 +225,7 @@ export default function Home() {
 
         <Divider />
 
-        <section id="start" className="mx-auto max-w-3xl px-6 py-20">
+        <section id="start" className="mx-auto max-w-3xl px-4 sm:px-6 py-12 md:py-20">
           <h2 className="text-2xl font-semibold tracking-tight">Get started</h2>
           <ul className="mt-6 space-y-3 text-zinc-700">
             <li>
@@ -255,7 +255,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-zinc-200 mt-12">
-        <div className="mx-auto max-w-7xl px-6 py-8 text-sm text-zinc-500 flex flex-wrap items-center gap-x-4 gap-y-2 justify-between">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 text-sm text-zinc-500 flex flex-wrap items-center gap-x-4 gap-y-2 justify-between">
           <span>CADML 0.1 · © {new Date().getFullYear()} miosal</span>
           <a
             href={REPO_URL}
@@ -273,7 +273,7 @@ export default function Home() {
 
 function Divider() {
   return (
-    <div className="mx-auto max-w-3xl px-6">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6">
       <div className="h-px bg-zinc-200" />
     </div>
   );

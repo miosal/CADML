@@ -150,14 +150,40 @@ export function Showcase() {
   }, [source, example.id]);
 
   const color = firstPartColor(source);
-  const editorClipPath = isDesktop
-    ? `inset(0 ${100 - percent}% 0 0)`
-    : `inset(0 0 50% 0)`;
+  // Desktop reveal-slider: editor is clipped to (percent)% of the card
+  // width, exposing the 3D render beneath as the slider moves right.
+  // Mobile uses a separate stacked layout below, no clip needed.
+  const editorClipPath = `inset(0 ${100 - percent}% 0 0)`;
+
+  // Reusable bits used by both layouts.
+  const suspenseOverlay = (
+    <div
+      aria-hidden
+      className={
+        'pointer-events-none absolute inset-0 ' +
+        'bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)] ' +
+        'transition-opacity duration-300 ease-out ' +
+        (showOverlay ? 'opacity-70' : 'opacity-0')
+      }
+    />
+  );
+  const evaluatingBadge = (
+    <div
+      className={
+        'pointer-events-none absolute bottom-3 right-3 px-2 py-1 ' +
+        'bg-zinc-900/85 text-white text-xs rounded ' +
+        'transition-opacity duration-200 ' +
+        (showOverlay ? 'opacity-100' : 'opacity-0')
+      }
+    >
+      Evaluating…
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-3 w-full">
       <div
-        className="flex gap-1 flex-wrap text-sm"
+        className="flex gap-1 flex-wrap text-xs sm:text-sm"
         role="tablist"
         aria-label="Example"
         onKeyDown={(e) => {
@@ -190,7 +216,7 @@ export function Showcase() {
             tabIndex={e.id === exampleId ? 0 : -1}
             onClick={() => setExampleId(e.id)}
             className={
-              'px-3 py-1 rounded-md border transition-colors ' +
+              'px-2 sm:px-3 py-1 rounded-md border transition-colors whitespace-nowrap ' +
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ' +
               (e.id === exampleId
                 ? 'bg-zinc-900 text-white border-zinc-900'
@@ -202,55 +228,43 @@ export function Showcase() {
         ))}
       </div>
 
-      <div className="relative w-full aspect-[3/4] md:aspect-[16/10] rounded-xl border border-zinc-200 bg-white overflow-hidden">
-        {/* render layer (below) */}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)]">
-          <Viewport mesh={mesh} color={color} xShift={isDesktop ? 0.15 : 0} cameraPhi={example.cameraPhi} />
-        </div>
-
-        {/* suspense overlay — fades in on slow compiles, out on success */}
-        <div
-          aria-hidden
-          className={
-            'pointer-events-none absolute inset-0 ' +
-            'bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)] ' +
-            'transition-opacity duration-300 ease-out ' +
-            (showOverlay ? 'opacity-70' : 'opacity-0')
-          }
-        />
-
-        {/* editor layer (above, clipped) */}
-        <div
-          className="absolute inset-0 bg-white"
-          style={{ clipPath: editorClipPath }}
-        >
-          <CadmlEditor value={source} onChange={setSource} markers={markers} />
-        </div>
-
-        {/* slider — desktop only */}
-        {isDesktop && (
-          <RevealSlider percent={percent} onPercent={setPercent} />
-        )}
-
-        {/* mobile divider label */}
-        {!isDesktop && (
-          <div className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-zinc-500 bg-white/80 rounded">
-            ↑ source · render ↓
+      {isDesktop ? (
+        /* Desktop / wide layout: editor overlaid on render, wiped by
+           the reveal slider. */
+        <div className="relative w-full aspect-[16/10] rounded-xl border border-zinc-200 bg-white overflow-hidden">
+          {/* render layer (below) */}
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)]">
+            <Viewport mesh={mesh} color={color} xShift={0.15} cameraPhi={example.cameraPhi} />
           </div>
-        )}
-
-        {/* "Evaluating…" badge, gated on the same delay as the overlay */}
-        <div
-          className={
-            'pointer-events-none absolute bottom-3 right-3 px-2 py-1 ' +
-            'bg-zinc-900/85 text-white text-xs rounded ' +
-            'transition-opacity duration-200 ' +
-            (showOverlay ? 'opacity-100' : 'opacity-0')
-          }
-        >
-          Evaluating…
+          {suspenseOverlay}
+          {/* editor layer (above, clipped) */}
+          <div
+            className="absolute inset-0 bg-white"
+            style={{ clipPath: editorClipPath }}
+          >
+            <CadmlEditor value={source} onChange={setSource} markers={markers} />
+          </div>
+          <RevealSlider percent={percent} onPercent={setPercent} />
+          {evaluatingBadge}
         </div>
-      </div>
+      ) : (
+        /* Mobile / tablet layout: render on top, editor on bottom,
+           hairline border between. No overlap, no slider — the
+           reveal mechanic only makes sense when both panels share
+           one rectangle, which doesn't fit a narrow viewport. */
+        <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
+          {/* render (top) */}
+          <div className="relative aspect-[4/3] bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)]">
+            <Viewport mesh={mesh} color={color} xShift={0} cameraPhi={example.cameraPhi} />
+            {suspenseOverlay}
+            {evaluatingBadge}
+          </div>
+          {/* editor (bottom) */}
+          <div className="border-t border-zinc-200 h-[420px]">
+            <CadmlEditor value={source} onChange={setSource} markers={markers} />
+          </div>
+        </div>
+      )}
 
       <p
         className={
