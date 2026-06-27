@@ -8,6 +8,7 @@
 
 #include "cli_panic.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
