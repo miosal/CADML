@@ -41,6 +41,18 @@ jobs:
       - name: Report artifact size
         run: ls -l build/wasm/cadml.js build/wasm/cadml.wasm
 
+      # Publish the built module so it can be vendored into web/public/wasm
+      # without a local emscripten toolchain (download with `gh run download`).
+      - name: Upload wasm artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cadml-wasm
+          path: |
+            build/wasm/cadml.js
+            build/wasm/cadml.wasm
+          if-no-files-found: error
+
       - name: End-to-end test
         working-directory: src/wasm
         run: node test_cadml_wasm.cjs
