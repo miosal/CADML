@@ -10,9 +10,13 @@ specification and a C++ reference implementation.
 
 ## Status
 
-CADML is experimental software at version 0.1. The language is not
-stable, the specification may change without backward-compatibility
-guarantees, and the implementation has not been hardened against
+CADML is experimental software at version 0.1.1, implementing version
+0.1 of the CADML language specification. (These version numbers are
+independent: the software follows semver and changes with each release,
+while the language spec version only changes when the language does.)
+The language is not stable, the specification may change without
+backward-compatibility guarantees, and the implementation has not been
+hardened against
 hostile input — it has not undergone a security audit and may
 contain memory-safety bugs or input-validation gaps when parsing or
 evaluating untrusted `.cadml` sources. Do not use it for anything
