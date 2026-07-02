@@ -392,21 +392,11 @@ ImportParse parse_import_line(std::string_view line) {
     decl.is_lua = p.size() >= 4 &&
                   p.compare(p.size() - 4, 4, ".lua") == 0;
 
-    // Spec §4.4: import alias cannot collide with a built-in element name.
-    // (Both the explicitly-given `as <alias>` and the filename-derived
-    // default are subject to this rule.) Checked against the 0.1 baseline
-    // set here — the file's `version` may not have been read yet
-    // (frontmatter ordering is a style rule, not enforced), so names
-    // reserved only by newer spec versions are re-checked in
-    // parse_frontmatter once all lines are in.
-    if (node_type_from_builtin_name(decl.alias, kSpecV01) != NodeType::Unknown) {
-        out.error = std::string(
-            "import: alias `" + decl.alias +
-            "` collides with a built-in element name. Use `as <other>` to"
-            " disambiguate.");
-        return out;
-    }
-
+    // Spec §4.4 (alias vs built-in collision) is NOT checked here: the
+    // reserved set depends on the file's declared spec version (§15.2),
+    // and the `version` line may not have been read yet — frontmatter
+    // ordering is a style rule, not enforced. parse_frontmatter runs the
+    // single check over all recorded imports at every parse-loop exit.
     out.decl = std::move(decl);
     return out;
 }
@@ -580,23 +570,27 @@ FrontmatterResult parse_frontmatter(std::string_view source,
         out.warnings.push_back(std::move(w));
     };
 
-    // Aliases are validated against the 0.1 baseline set as each import
-    // line parses; a name reserved only by a NEWER spec version needs the
-    // file's final `version` (frontmatter ordering is not enforced), so
-    // those are checked here, once, at every exit from the parse loop.
-    auto check_versioned_aliases = [&]() {
+    // Spec §4.4: an import alias cannot collide with a built-in element
+    // name, judged against the file's declared spec version (§15.2
+    // pinning). This is the single check site for the rule, run at every
+    // exit from the parse loop rather than per import line, because
+    // frontmatter ordering is a style rule, not enforced — the `version`
+    // line may arrive after an import.
+    auto check_aliases = [&]() {
         const auto spec = spec_version_from_string(out.meta.version);
         for (const auto& decl : out.imports) {
-            const auto since = builtin_since(decl.alias);
-            if (since && kSpecV01 < *since && *since <= spec) {
-                push_error(
-                    "import: alias `" + decl.alias + "` collides with a"
-                    " built-in element name (reserved since spec " +
-                    std::to_string(since->major) + "." +
-                    std::to_string(since->minor) + "). Use `as <other>`"
-                    " to disambiguate.",
-                    decl.source);
+            if (node_type_from_builtin_name(decl.alias, spec)
+                    == NodeType::Unknown) {
+                continue;
             }
+            std::string msg = "import: alias `" + decl.alias +
+                "` collides with a built-in element name";
+            if (const auto since = builtin_since(decl.alias);
+                since && kSpecV01 < *since) {
+                msg += " (reserved since spec " + to_string(*since) + ")";
+            }
+            msg += ". Use `as <other>` to disambiguate.";
+            push_error(std::move(msg), decl.source);
         }
     };
 
@@ -612,7 +606,7 @@ FrontmatterResult parse_frontmatter(std::string_view source,
         }
         if (!at_end(probe) && probe.src[probe.pos] == '<') {
             out.body_offset = probe.pos;
-            check_versioned_aliases();
+            check_aliases();
             return out;
         }
 
@@ -709,7 +703,7 @@ FrontmatterResult parse_frontmatter(std::string_view source,
     }
 
     out.body_offset = c.pos;
-    check_versioned_aliases();
+    check_aliases();
     return out;
 }
 

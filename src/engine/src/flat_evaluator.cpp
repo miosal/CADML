@@ -1626,8 +1626,7 @@ FlatMesh eval_instance(const Document& doc, const Node& inst_node,
         if (const auto since = builtin_since(ia.ref_name);
             since && spec_version_from_string(doc.meta.version) < *since) {
             msg += " — `" + ia.ref_name + "` is a built-in element since"
-                   " spec version " + std::to_string(since->major) + "." +
-                   std::to_string(since->minor) + "; this document"
+                   " spec version " + to_string(*since) + "; this document"
                    " declares `version " + doc.meta.version + "`";
         }
         warnings.push_back({ std::move(msg), inst_node.source });

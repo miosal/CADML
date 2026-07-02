@@ -248,6 +248,44 @@ TEST(Bundler, DefNamedStlRejectedInSpec02) {
               std::string::npos);
 }
 
+TEST(Bundler, MalformedSpecVersionSuffixRejected) {
+    // §15.3 promises rejection for anything that is not a supported
+    // major.minor[.patch]; a 4-char prefix check used to let malformed
+    // suffixes through and stamp them verbatim into the flat output.
+    for (const char* v : { "0.2.", "0.2.banana", "0.2.0.0" }) {
+        auto r = cs(std::string("version ") + v + "\n<part name=\"p\"/>");
+        ASSERT_FALSE(r.ok()) << "accepted malformed version: " << v;
+        EXPECT_NE(r.errors[0].message.find("unrecognized spec version"),
+                  std::string::npos) << v;
+    }
+}
+
+TEST(Bundler, HostileVersionDigitRunRejectedCleanly) {
+    // Regression: a huge numeric component used to hit signed-integer
+    // overflow (UB) in spec_version_from_string before the acceptance
+    // check could reject it.
+    auto r = cs("version 99999999999999999999.1\n<part name=\"p\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("unrecognized spec version"),
+              std::string::npos);
+}
+
+TEST(Bundler, StlInStaleSpec01DocumentIsCompileError) {
+    // §15.2 pinning classifies <stl> in a `version 0.1` document as an
+    // ordinary instance reference. If nothing defines the name, that is
+    // a stale `version` declaration: fail the compile with a pointed
+    // error rather than exiting 0 and rendering an empty mesh at eval
+    // (files that were valid under software v0.1.1 hit exactly this).
+    auto r = cs(
+        "version 0.1\n"
+        "<part name=\"p\"><stl data=\"AAAA\"/></part>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("since spec version 0.2"),
+              std::string::npos);
+    EXPECT_NE(r.errors[0].message.find("bump the `version`"),
+              std::string::npos);
+}
+
 // ─── <stl> source validation ────────────────────────────────────────
 
 TEST(Bundler, StlBothSourcesRejected) {

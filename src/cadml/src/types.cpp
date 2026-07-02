@@ -66,23 +66,58 @@ constexpr std::array<BuiltinEntry, 31> kBuiltins = {{
 
 }  // namespace
 
+namespace {
+
+// Ceiling for a parsed version component: far above any real spec
+// version, low enough that the accumulate step cannot overflow int. A
+// hostile `version 99999999999999999999` must yield a (rejectable)
+// saturated value, not signed-overflow UB.
+constexpr int kSpecComponentCap = 1'000'000;
+
+// Read a saturating decimal run at `i`. Returns whether any digit was
+// consumed; `i` always advances past the whole run.
+bool read_spec_component(std::string_view s, std::size_t& i, int& dst) {
+    bool any = false;
+    while (i < s.size() && s[i] >= '0' && s[i] <= '9') {
+        if (dst < kSpecComponentCap) dst = dst * 10 + (s[i] - '0');
+        if (dst > kSpecComponentCap) dst = kSpecComponentCap;
+        ++i;
+        any = true;
+    }
+    return any;
+}
+
+}  // namespace
+
+std::string to_string(SpecVersion v) {
+    return std::to_string(v.major) + "." + std::to_string(v.minor);
+}
+
 SpecVersion spec_version_from_string(std::string_view version) {
     SpecVersion out = kSpecV01;
     int major = 0, minor = 0;
     std::size_t i = 0;
-    auto read_int = [&](int& dst) {
-        bool any = false;
-        while (i < version.size() && version[i] >= '0' && version[i] <= '9') {
-            dst = dst * 10 + (version[i] - '0');
-            ++i;
-            any = true;
-        }
-        return any;
-    };
-    if (!read_int(major)) return out;
+    if (!read_spec_component(version, i, major)) return out;
     if (i >= version.size() || version[i] != '.') return out;
     ++i;
-    if (!read_int(minor)) return out;
+    if (!read_spec_component(version, i, minor)) return out;
+    return SpecVersion{major, minor};
+}
+
+std::optional<SpecVersion> spec_version_parse_strict(std::string_view version) {
+    int major = 0, minor = 0, patch = 0;
+    std::size_t i = 0;
+    if (!read_spec_component(version, i, major)) return std::nullopt;
+    if (i >= version.size() || version[i] != '.') return std::nullopt;
+    ++i;
+    if (!read_spec_component(version, i, minor)) return std::nullopt;
+    if (i < version.size()) {  // optional ".patch", digits only
+        if (version[i] != '.') return std::nullopt;
+        ++i;
+        if (!read_spec_component(version, i, patch)) return std::nullopt;
+    }
+    if (i != version.size()) return std::nullopt;
+    (void)patch;  // validated (digits only) but never affects vocabulary
     return SpecVersion{major, minor};
 }
 

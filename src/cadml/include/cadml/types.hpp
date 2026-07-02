@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <compare>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -181,16 +182,13 @@ struct SpecVersion {
     int major = 0;
     int minor = 1;
 
-    friend constexpr bool operator==(SpecVersion a, SpecVersion b) {
-        return a.major == b.major && a.minor == b.minor;
-    }
-    friend constexpr bool operator<(SpecVersion a, SpecVersion b) {
-        return a.major != b.major ? a.major < b.major : a.minor < b.minor;
-    }
-    friend constexpr bool operator<=(SpecVersion a, SpecVersion b) {
-        return a == b || a < b;
-    }
+    // Member order gives lexicographic (major, minor) comparison.
+    friend constexpr bool operator==(SpecVersion, SpecVersion) = default;
+    friend constexpr auto operator<=>(SpecVersion, SpecVersion) = default;
 };
+
+// Canonical "major.minor" rendering for diagnostics.
+std::string to_string(SpecVersion v);
 
 inline constexpr SpecVersion kSpecV01{0, 1};
 inline constexpr SpecVersion kSpecV02{0, 2};
@@ -204,8 +202,16 @@ inline constexpr SpecVersion kSpecLatest = kSpecV02;
 // the normalised "0.2.0" form DocumentMeta stores as well as a bare
 // "0.2"). Unparseable input yields the conservative kSpecV01 — the
 // smallest vocabulary — and is separately rejected by the compiler's
-// version acceptance check.
+// version acceptance check. Components saturate well above any real
+// spec version rather than overflowing on hostile digit runs.
 SpecVersion spec_version_from_string(std::string_view version);
+
+// Strict form for ACCEPTANCE checks (§15.3): the string must be exactly
+// `major.minor` or `major.minor.patch` with all-digit components — no
+// trailing junk, no extra components. Returns nullopt otherwise. The
+// patch component never affects vocabulary, so it is validated but not
+// represented.
+std::optional<SpecVersion> spec_version_parse_strict(std::string_view version);
 
 // Convert an element name to its NodeType, as seen by a document that
 // declares `spec`: names introduced by a newer spec version return

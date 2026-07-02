@@ -257,6 +257,80 @@ TEST(InMemory, ImportOfOlderSpecFileAccepted) {
     EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
 }
 
+TEST(InMemory, OlderImportUsingNewerReservedDefNameRejected) {
+    // The flat output declares the ENTRY's version. A 0.1 library may
+    // legally name a def `stl` (§15.2), but merged under a 0.2 entry
+    // that def would serialize as `<def name="stl">` in a file declaring
+    // 0.2 — where the name re-parses as the built-in, so the compile
+    // must fail rather than emit an artifact that cannot re-parse.
+    auto r = compile_in_memory(
+        files({
+            { "lib.cadml",
+              "version 0.1\n"
+              "<def name=\"stl\"><extrude height=\"1\">"
+              "<circle r=\"1\"/></extrude></def>\n"
+              "<part name=\"l\"><stl/></part>" },
+            { "main.cadml",
+              "version 0.2\nimport \"lib.cadml\" as lib\n"
+              "<part name=\"p\"><lib/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("collides with a built-in element name of the"
+                           " entry document's spec version 0.2")
+                != std::string::npos)
+            found = true;
+    EXPECT_TRUE(found)
+        << "0.1 import's `stl` namespace must be rejected under a 0.2 entry";
+}
+
+TEST(InMemory, OlderImportUsingNewerReservedAliasRejected) {
+    // Same rule via an import alias: a 0.1 file may alias an import as
+    // `stl` (§15.2); under a 0.2 entry that alias becomes a def named
+    // `stl` in the merged document and must be rejected.
+    auto r = compile_in_memory(
+        files({
+            { "thing.cadml",
+              "version 0.1\n<part name=\"t\"><circle r=\"1\"/></part>" },
+            { "lib.cadml",
+              "version 0.1\nimport \"thing.cadml\" as stl\n"
+              "<part name=\"l\"><stl/></part>" },
+            { "main.cadml",
+              "version 0.2\nimport \"lib.cadml\" as lib\n"
+              "<part name=\"p\"><lib/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("collides with a built-in") != std::string::npos)
+            found = true;
+    EXPECT_TRUE(found);
+}
+
+TEST(InMemory, OlderImportWithUnreservedNamesStillAcceptedUnderNewerEntry) {
+    // Control for the two tests above: a 0.1 import whose namespace
+    // avoids newer-reserved names composes cleanly into a 0.2 entry,
+    // and the flat output re-parses (compiles) clean.
+    auto r = compile_in_memory(
+        files({
+            { "lib.cadml",
+              "version 0.1\n"
+              "<def name=\"widget\"><extrude height=\"1\">"
+              "<circle r=\"1\"/></extrude></def>\n"
+              "<part name=\"l\"><widget/></part>" },
+            { "main.cadml",
+              "version 0.2\nimport \"lib.cadml\" as lib\n"
+              "<part name=\"p\"><lib/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    auto r2 = compile_string(r.flat_text);
+    EXPECT_TRUE(r2.ok()) << (r2.errors.empty() ? "" : r2.errors[0].message);
+}
+
 // ─── Cycle detection works through the in-memory provider ───────────
 
 TEST(InMemory, CircularImportDetected) {

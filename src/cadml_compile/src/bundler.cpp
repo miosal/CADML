@@ -128,20 +128,22 @@ bool key_escapes_root(std::string_view key) {
 }
 
 // Spec-version acceptance (§15.3): true iff `v` names a spec line this
-// compiler implements (0.1.x or 0.2.x — patch digits are free, since a
-// patch never adds vocabulary). Applied to the entry document and to
-// every imported file. Acceptance only gates *recognition*; each file
-// is separately VALIDATED against its own declared version's reserved
-// set at parse time (§15.2 pinning).
+// compiler implements — every version from kSpecV01 up to kSpecLatest,
+// with free patch digits (a patch never adds vocabulary). Applied to
+// the entry document and to every imported file. Acceptance only gates
+// *recognition*; each file is separately VALIDATED against its own
+// declared version's reserved set at parse time (§15.2 pinning).
+// Derives from kSpecLatest so a future spec bump needs no edit here.
 bool is_supported_spec_version(const std::string& v) {
-    const auto spec = cadml::spec_version_from_string(v);
-    const bool known_line =
-        spec == cadml::kSpecV01 || spec == cadml::kSpecV02;
-    const bool well_formed =
-        v == "0.1" || v == "0.2" ||
-        (v.size() >= 4 && (v.compare(0, 4, "0.1.") == 0 ||
-                           v.compare(0, 4, "0.2.") == 0));
-    return known_line && well_formed;
+    const auto spec = cadml::spec_version_parse_strict(v);
+    return spec && cadml::kSpecV01 <= *spec && *spec <= cadml::kSpecLatest;
+}
+
+// Human-readable acceptance range for §15.3 diagnostics — derived from
+// the same constants as the check itself, so the two cannot drift.
+std::string supported_spec_versions_text() {
+    return cadml::to_string(cadml::kSpecV01) + ".x through " +
+           cadml::to_string(cadml::kSpecLatest) + ".x";
 }
 
 // ─── Lua module wrapping ─────────────────────────────────────────────
@@ -266,11 +268,15 @@ struct ImportContext {
     // The ENTRY document's declared spec version. The flat output
     // carries the entry's version, so no imported file may be written
     // against a newer spec (its nodes would re-parse against a reserved
-    // set that cannot see them).
-    SpecVersion entry_spec = kSpecLatest;
+    // set that cannot see them). Constructor-required so a new call
+    // site cannot forget to set it (a stale default would silently
+    // disable the cross-version import checks).
+    const SpecVersion entry_spec;
     std::vector<SourceFile>   source_files;    // by id
     std::vector<CompileError> errors;
     std::vector<CompileError> warnings;
+
+    explicit ImportContext(SpecVersion entry) : entry_spec(entry) {}
 
     // Register a source file under its normalized relative `key` (which
     // becomes the `<source path="...">` entry verbatim). Idempotent: a
@@ -565,27 +571,28 @@ void resolve_imports_into(Document& host, ImportContext& ctx,
         // be newer than the entry document's — the flat output declares
         // the entry's version, so defs using newer vocabulary would
         // re-parse against a reserved set that cannot see them.
+        // (Parsed once; both branches share one error-and-skip epilogue.)
         const auto& sub_version = sub.document.meta.version;
+        const auto  sub_spec    = spec_version_from_string(sub_version);
+        auto        spec_cat    = CompileError::Schema;
+        std::string spec_error;
         if (!sub_version.empty() && !is_supported_spec_version(sub_version)) {
-            ctx.push_error(CompileError::Schema,
+            spec_error =
                 "import: `" + imp.path + "` declares unrecognized spec"
                 " version `" + sub_version + "` — this compiler"
-                " implements 0.1.x and 0.2.x (see spec §15.3)",
-                imp.source);
-            ctx.visited.erase(key);
-            continue;
-        }
-        if (const auto sub_spec = spec_version_from_string(sub_version);
-            ctx.entry_spec < sub_spec) {
-            ctx.push_error(CompileError::Import,
+                " implements " + supported_spec_versions_text() +
+                " (see spec §15.3)";
+        } else if (ctx.entry_spec < sub_spec) {
+            spec_cat   = CompileError::Import;
+            spec_error =
                 "import: `" + imp.path + "` is written against spec"
-                " version " + std::to_string(sub_spec.major) + "." +
-                std::to_string(sub_spec.minor) + " but the entry document"
-                " declares " + std::to_string(ctx.entry_spec.major) + "." +
-                std::to_string(ctx.entry_spec.minor) + " — a document"
-                " cannot import files that require a newer spec; bump the"
-                " entry's `version` declaration",
-                imp.source);
+                " version " + to_string(sub_spec) + " but the entry"
+                " document declares " + to_string(ctx.entry_spec) +
+                " — a document cannot import files that require a newer"
+                " spec; bump the entry's `version` declaration";
+        }
+        if (!spec_error.empty()) {
+            ctx.push_error(spec_cat, std::move(spec_error), imp.source);
             ctx.visited.erase(key);
             continue;
         }
@@ -724,30 +731,105 @@ void hoist_entry_params(Document& doc) {
 // Inside an imported sub-assembly, an Instance's `ref_name` is local to
 // that sub-assembly's namespace; the host's def index keys it as
 // "<containing-def>.<ref_name>". Resolve by walking up to the closest
-// Def/Part ancestor and trying the qualified name first.
+// Def/Part ancestor and trying the qualified name first. These two
+// helpers implement that rule for every pass that needs it
+// (param-override validation, the def-cycle check, and the entry-spec
+// vocabulary check below).
+std::string closest_def_or_part_name(const Document& doc,
+                                      std::uint32_t node_idx) {
+    auto cur = doc.nodes[node_idx].parent;
+    while (cur != NO_NODE) {
+        const auto& a = doc.nodes[cur];
+        if (a.type == NodeType::Def)  return std::get<DefAttrs>(a.attrs).name;
+        if (a.type == NodeType::Part) return std::get<PartAttrs>(a.attrs).name;
+        cur = a.parent;
+    }
+    return {};
+}
+
+std::int64_t resolve_instance_ref(const Document& doc,
+                                   std::uint32_t node_idx,
+                                   const std::string& ref_name) {
+    const auto prefix = closest_def_or_part_name(doc, node_idx);
+    if (!prefix.empty()) {
+        const auto it = doc.defs.find(prefix + "." + ref_name);
+        if (it != doc.defs.end()) return static_cast<std::int64_t>(it->second);
+    }
+    const auto it = doc.defs.find(ref_name);
+    if (it != doc.defs.end()) return static_cast<std::int64_t>(it->second);
+    return -1;
+}
+
+// §15.2/§15.3 coherence of the MERGED document: the flat output declares
+// the ENTRY file's spec version, so every def name and instance
+// reference in it must mean the same thing when re-parsed under that
+// version's reserved set. Two ways this can break, both diagnosed here:
+//
+//  1. An older-spec import legally uses a name (as a def, alias, or
+//     instance reference) that the entry's newer spec reserves — e.g. a
+//     `version 0.1` library with `<def name="stl">` merged into a
+//     `version 0.2` entry. Serialized flat output would re-parse the
+//     name as the built-in, corrupting the round-trip.
+//
+//  2. A document uses a built-in introduced AFTER its declared spec
+//     version — e.g. `<stl>` in a `version 0.1` file, where §15.2
+//     pinning classifies the name as an ordinary instance reference.
+//     If nothing defines that name it can only be a stale `version`
+//     declaration; failing the compile with a pointed error beats
+//     compiling clean and rendering an empty mesh at eval.
+//
+// Dotted references (`lib.gear`) can never collide with built-ins (no
+// built-in name contains a dot), so they pass through untouched.
+void check_entry_spec_vocabulary(const Document& doc,
+                                  std::vector<CompileError>& errors) {
+    const auto entry_spec = spec_version_from_string(doc.meta.version);
+    for (std::uint32_t ni = 0; ni < doc.nodes.size(); ++ni) {
+        const auto& n = doc.nodes[ni];
+        if (n.dead) continue;
+        if (n.type == NodeType::Def) {
+            const auto& da = std::get<DefAttrs>(n.attrs);
+            if (node_type_from_builtin_name(da.name, entry_spec)
+                    != NodeType::Unknown) {
+                errors.push_back({ CompileError::Vocabulary,
+                    "<def name=\"" + da.name + "\"> (from an imported file"
+                    " whose older spec version leaves the name free)"
+                    " collides with a built-in element name of the entry"
+                    " document's spec version " + to_string(entry_spec) +
+                    " — rename the def or its import alias",
+                    n.source });
+            }
+        } else if (n.type == NodeType::Instance) {
+            const auto& ia = std::get<InstanceAttrs>(n.attrs);
+            if (node_type_from_builtin_name(ia.ref_name, entry_spec)
+                    != NodeType::Unknown) {
+                errors.push_back({ CompileError::Vocabulary,
+                    "reference `<" + ia.ref_name + "/>` (from an imported"
+                    " file whose older spec version leaves the name free)"
+                    " collides with a built-in element name of the entry"
+                    " document's spec version " + to_string(entry_spec) +
+                    " — rename the referenced def or its import alias",
+                    n.source });
+            } else if (const auto since = builtin_since(ia.ref_name);
+                       since && entry_spec < *since &&
+                       resolve_instance_ref(doc, ni, ia.ref_name) < 0) {
+                errors.push_back({ CompileError::Vocabulary,
+                    "`<" + ia.ref_name + "/>` does not resolve to any def"
+                    " — it is a built-in element since spec version " +
+                    to_string(*since) + ", but this document declares"
+                    " `version " + doc.meta.version + "`; bump the"
+                    " `version` declaration to use the built-in",
+                    n.source });
+            }
+        }
+    }
+}
+
 void validate_param_overrides(const Document& doc,
                                 const std::vector<ParamDecl>& entry_params,
                                 std::vector<CompileError>& errors) {
-    auto closest_def_prefix = [&](std::uint32_t node_idx) -> std::string {
-        auto cur = doc.nodes[node_idx].parent;
-        while (cur != NO_NODE) {
-            const auto& a = doc.nodes[cur];
-            if (a.type == NodeType::Def)  return std::get<DefAttrs>(a.attrs).name;
-            if (a.type == NodeType::Part) return std::get<PartAttrs>(a.attrs).name;
-            cur = a.parent;
-        }
-        return {};
-    };
     auto resolve_def = [&](std::uint32_t node_idx,
                             const std::string& ref_name) -> std::int64_t {
-        const auto prefix = closest_def_prefix(node_idx);
-        if (!prefix.empty()) {
-            const auto it = doc.defs.find(prefix + "." + ref_name);
-            if (it != doc.defs.end()) return static_cast<std::int64_t>(it->second);
-        }
-        const auto it = doc.defs.find(ref_name);
-        if (it != doc.defs.end()) return static_cast<std::int64_t>(it->second);
-        return -1;
+        return resolve_instance_ref(doc, node_idx, ref_name);
     };
 
     for (std::uint32_t ni = 0; ni < doc.nodes.size(); ++ni) {
@@ -1080,26 +1162,9 @@ void check_unsupported_constructs(const Document& doc,
 // reference from a <part> body is not part of the graph, so ordinary
 // (acyclic) def composition is unaffected.
 void check_def_cycles(const Document& doc, std::vector<CompileError>& errors) {
-    auto closest_named_prefix = [&](std::uint32_t node_idx) -> std::string {
-        auto cur = doc.nodes[node_idx].parent;
-        while (cur != NO_NODE) {
-            const auto& a = doc.nodes[cur];
-            if (a.type == NodeType::Def)  return std::get<DefAttrs>(a.attrs).name;
-            if (a.type == NodeType::Part) return std::get<PartAttrs>(a.attrs).name;
-            cur = a.parent;
-        }
-        return {};
-    };
     auto resolve_def = [&](std::uint32_t node_idx,
                             const std::string& ref) -> std::int64_t {
-        const auto prefix = closest_named_prefix(node_idx);
-        if (!prefix.empty()) {
-            const auto it = doc.defs.find(prefix + "." + ref);
-            if (it != doc.defs.end()) return static_cast<std::int64_t>(it->second);
-        }
-        const auto it = doc.defs.find(ref);
-        if (it != doc.defs.end()) return static_cast<std::int64_t>(it->second);
-        return -1;
+        return resolve_instance_ref(doc, node_idx, ref);
     };
     auto closest_def_ancestor = [&](std::uint32_t node_idx) -> std::int64_t {
         auto cur = doc.nodes[node_idx].parent;
@@ -1298,21 +1363,21 @@ bool parse_entry(CompileResult& result, std::string_view source) {
     }
     if (!parsed.ok()) return false;
     // Per spec §15.3: the compiler accepts every spec version it
-    // implements (0.1 and 0.2, plus patch-level refinements — patch
-    // releases add no vocabulary) and rejects any other declaration so
-    // a future 0.3 file can't silently parse under older semantics.
-    // Each file is still *validated* against its own declared version's
-    // reserved set (§15.2) — acceptance here only gates recognition.
-    // (Empty version is already rejected by the parser when the file
-    // has any content; that case won't reach here.)
+    // implements (patch-level refinements included — patch releases add
+    // no vocabulary) and rejects any other declaration so a future file
+    // written against a newer spec can't silently parse under older
+    // semantics. Each file is still *validated* against its own declared
+    // version's reserved set (§15.2) — acceptance here only gates
+    // recognition. (Empty version is already rejected by the parser when
+    // the file has any content; that case won't reach here.)
     if (!parsed.document.meta.version.empty() &&
         !is_supported_spec_version(parsed.document.meta.version)) {
         CompileError ce;
         ce.category = CompileError::Schema;
         ce.message  = "unrecognized spec version `" +
             parsed.document.meta.version +
-            "` — this compiler implements 0.1.x and 0.2.x"
-            " (see spec §15.3)";
+            "` — this compiler implements " +
+            supported_spec_versions_text() + " (see spec §15.3)";
         ce.source = {};
         result.errors.push_back(std::move(ce));
         return false;
@@ -1342,6 +1407,11 @@ void seed_entry_source(CompileResult& result, std::string_view source,
 // (filesystem) and compile_in_memory (in-memory) — they differ only in
 // HOW imports were resolved before this runs, not in what happens after.
 void run_lowering(CompileResult& result, const CompileOptions& opts) {
+    // Every name in the merged document must stay coherent under the
+    // entry's declared spec version (§15.2/§15.3) — checked before
+    // unrolling so each offending site is reported once, not per clone.
+    check_entry_spec_vocabulary(result.document, result.errors);
+
     // Capture entry-file params before hoisting moves them into the body.
     const auto entry_params = result.document.params;
 
@@ -1401,9 +1471,8 @@ CompileResult compile_string(std::string_view source,
         // was supplied as `source` (not read through the provider), and
         // it lives at the root, so its imports resolve relative to "".
         FilesystemProvider provider{ base_dir };
-        ImportContext ctx;
-        ctx.entry_spec =
-            spec_version_from_string(result.document.meta.version);
+        ImportContext ctx(
+            spec_version_from_string(result.document.meta.version));
         ctx.source_files = result.document.source_files;
         resolve_imports_into(result.document, ctx, provider,
                               /*importing_dir_key=*/"");
@@ -1474,8 +1543,8 @@ CompileResult compile_in_memory(const std::vector<InMemoryFile>& files,
     if (!parse_entry(result, *entry_src.contents)) return result;
     seed_entry_source(result, *entry_src.contents, entry_key);
 
-    ImportContext ctx;
-    ctx.entry_spec = spec_version_from_string(result.document.meta.version);
+    ImportContext ctx(
+        spec_version_from_string(result.document.meta.version));
     ctx.source_files = result.document.source_files;
     // Register the entry as file 0 in both maps so a self-import or a
     // diamond back to the entry is detected / reuses id 0.

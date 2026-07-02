@@ -169,3 +169,54 @@ TEST(Document, ChildIteratorWalksSiblings) {
     }
     EXPECT_EQ(visited.size(), 3u);
 }
+
+// ─── SpecVersion parsing ─────────────────────────────────────────────
+
+TEST(SpecVersion, LenientParseReadsMajorMinor) {
+    EXPECT_EQ(spec_version_from_string("0.1"),   kSpecV01);
+    EXPECT_EQ(spec_version_from_string("0.2"),   kSpecV02);
+    EXPECT_EQ(spec_version_from_string("0.2.0"), kSpecV02);
+    EXPECT_EQ(spec_version_from_string("0.2.7"), kSpecV02);
+}
+
+TEST(SpecVersion, LenientParseFallsBackConservatively) {
+    // Unparseable input yields kSpecV01 (the smallest vocabulary); the
+    // compiler's acceptance check rejects the string separately.
+    EXPECT_EQ(spec_version_from_string(""),      kSpecV01);
+    EXPECT_EQ(spec_version_from_string("x"),     kSpecV01);
+    EXPECT_EQ(spec_version_from_string("0"),     kSpecV01);
+    EXPECT_EQ(spec_version_from_string("0."),    kSpecV01);
+}
+
+TEST(SpecVersion, HostileDigitRunsSaturateInsteadOfOverflowing) {
+    // Regression: `dst = dst * 10 + digit` used to overflow int (UB) on
+    // long digit runs. Components must saturate to a rejectable value.
+    const auto v = spec_version_from_string("99999999999999999999.1");
+    EXPECT_GT(v.major, kSpecLatest.major);
+    const auto w = spec_version_from_string("0.99999999999999999999");
+    EXPECT_EQ(w.major, 0);
+    EXPECT_GT(w.minor, kSpecLatest.minor);
+}
+
+TEST(SpecVersion, StrictParseAcceptsExactForms) {
+    EXPECT_EQ(spec_version_parse_strict("0.1"),    kSpecV01);
+    EXPECT_EQ(spec_version_parse_strict("0.2"),    kSpecV02);
+    EXPECT_EQ(spec_version_parse_strict("0.1.0"),  kSpecV01);
+    EXPECT_EQ(spec_version_parse_strict("0.2.15"), kSpecV02);
+}
+
+TEST(SpecVersion, StrictParseRejectsMalformedStrings) {
+    EXPECT_EQ(spec_version_parse_strict(""),          std::nullopt);
+    EXPECT_EQ(spec_version_parse_strict("0"),         std::nullopt);
+    EXPECT_EQ(spec_version_parse_strict("0."),        std::nullopt);
+    EXPECT_EQ(spec_version_parse_strict("0.2."),      std::nullopt);
+    EXPECT_EQ(spec_version_parse_strict("0.2.banana"), std::nullopt);
+    EXPECT_EQ(spec_version_parse_strict("0.2.0.0"),   std::nullopt);
+    EXPECT_EQ(spec_version_parse_strict("0.2x"),      std::nullopt);
+    EXPECT_EQ(spec_version_parse_strict(" 0.2"),      std::nullopt);
+}
+
+TEST(SpecVersion, ToStringRendersMajorMinor) {
+    EXPECT_EQ(to_string(kSpecV01), "0.1");
+    EXPECT_EQ(to_string(kSpecV02), "0.2");
+}

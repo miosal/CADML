@@ -4,7 +4,7 @@ The CADML geometry engine.
 
 ## Library
 
-**`cadml_engine`** (alias `cadml::engine`) — the v0.1 engine.
+**`cadml_engine`** (alias `cadml::engine`) — the CADML reference engine.
 Consumes a flat `Document` (post-bundler `.fcadml`) and produces a
 `FlatEvalResult` (per-part meshes + diagnostics), plus the exporters
 (STL / 3MF / glTF) and analysis primitives (mass, bounds, topology,
