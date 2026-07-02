@@ -10,10 +10,9 @@ specification and a C++ reference implementation.
 
 ## Status
 
-CADML is experimental software at version 0.1.1, implementing version
-0.1 of the CADML language specification. (These version numbers are
-independent: the software follows semver and changes with each release,
-while the language spec version only changes when the language does.)
+CADML is experimental software implementing the
+[CADML language specification](docs/spec/language.md). Releases are
+published on the [releases page](https://github.com/miosal/CADML/releases).
 The language is not stable, the specification may change without
 backward-compatibility guarantees, and the implementation has not been
 hardened against
