@@ -1452,6 +1452,41 @@ manifold::OpType to_manifold_op(BoolOp op) {
 
 }  // namespace
 
+// Defined at detail scope (outside the anonymous namespace above) so
+// flat_evaluator can call it, while still reusing this translation unit's
+// to_meshgl / from_meshgl / status_to_string. to_meshgl already runs
+// Manifold's vertex Merge(), so constructing a Manifold from the raw soup
+// both welds coincident vertices and validates the topology in one step.
+MeshImportResult weld_mesh(FlatMesh raw, std::uint32_t source_node) {
+    MeshImportResult r;
+    if (raw.indices.empty()) {
+        r.error = "imported mesh is empty (no triangles)";
+        return r;
+    }
+
+    // Attribute every imported triangle to the <stl> node — the same
+    // contract native primitives uphold. to_meshgl copies triangle_node
+    // into faceID, so from_meshgl reads the attribution back after the
+    // weld, and the best-effort path below carries it directly. Restoring
+    // the normals invariant here keeps downstream consumers (merge_mesh,
+    // per-element analysis) positionally aligned on both paths.
+    raw.triangle_node.assign(raw.triangle_count(), source_node);
+    raw.normals.assign(raw.vertices.size(), Vec3{0, 0, 0});
+
+    manifold::Manifold m(to_meshgl(raw));
+    if (m.Status() != manifold::Manifold::Error::NoError) {
+        r.mesh  = std::move(raw);   // best-effort — let the caller still
+                                    // show the soup
+        r.error = std::string("imported mesh is not a valid manifold "
+                              "(not watertight — CSG may be unreliable): ") +
+                  status_to_string(m.Status());
+        return r;
+    }
+    r.mesh = from_meshgl(m.GetMeshGL64(), source_node);
+    r.ok   = true;
+    return r;
+}
+
 // ─── modifier helpers ────────────────────────────────────────────────
 
 namespace {

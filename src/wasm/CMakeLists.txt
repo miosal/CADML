@@ -7,6 +7,7 @@
 
 set(CADML_WASM_SRC
     # src/cadml — parser, types, expression evaluator, SHA-256, Lua, selector.
+    ${CMAKE_SOURCE_DIR}/src/cadml/src/base64.cpp
     ${CMAKE_SOURCE_DIR}/src/cadml/src/expression.cpp
     ${CMAKE_SOURCE_DIR}/src/cadml/src/lua.cpp
     ${CMAKE_SOURCE_DIR}/src/cadml/src/math.cpp
@@ -32,9 +33,20 @@ set(CADML_WASM_SRC
     ${CMAKE_SOURCE_DIR}/src/engine/src/flat_geometry.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/src/flat_gltf.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/src/flat_mesh_cache.cpp
-    ${CMAKE_SOURCE_DIR}/src/engine/src/flat_stl.cpp)
+    ${CMAKE_SOURCE_DIR}/src/engine/src/flat_stl.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/src/flat_stl_import.cpp)
 
 add_executable(cadml_wasm cadml_wasm.cpp ${CADML_WASM_SRC})
+
+# Keep the builder's checkout path out of the shipped artifact. Clang
+# spells anonymous lambda types as "(lambda at <absolute path>:line:col)",
+# and sol2 bakes those spellings into the binary as compile-time type-name
+# strings — so without this remap, cadml.wasm embeds whatever machine and
+# directory it was built in (/home/runner/... on CI, a contributor's home
+# directory locally). Mapping the source root to "." makes the artifact
+# path-neutral and byte-reproducible across build environments.
+target_compile_options(cadml_wasm PRIVATE
+    -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.)
 
 target_include_directories(cadml_wasm PRIVATE
     ${CMAKE_SOURCE_DIR}/src/cadml/include

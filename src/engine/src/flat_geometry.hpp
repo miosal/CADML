@@ -330,6 +330,32 @@ ModifierResult chamfer(const FlatMesh& input,
                         const Selector& sel,
                         std::uint32_t source_node);
 
+// ─── Mesh import ──────────────────────────────────────────────────────
+
+struct MeshImportResult {
+    FlatMesh    mesh;
+    bool        ok = false;
+    std::string error;
+};
+
+// Weld a raw imported triangle soup (three independent vertices per
+// triangle, as STL stores them) into a shared-vertex manifold solid and
+// report whether the result is a valid 2-manifold. Coincident vertices are
+// merged so a clean, watertight input becomes a solid that the boolean/hull
+// ops accept with no special-casing.
+//
+// On success `ok` is true and `mesh` is the welded, canonical solid. On a
+// non-manifold input (holes, non-manifold edges, flipped normals — common
+// in scans) or an empty input, `ok` is false, `error` describes it, and
+// `mesh` is the best-effort mesh so the caller can still surface the raw
+// geometry alongside the diagnostic. Repair is out of scope — this only
+// detects and reports.
+//
+// Every triangle in the result (welded or best-effort) is attributed to
+// `source_node`, and the FlatMesh size invariants (normals per vertex,
+// triangle_node per triangle) hold on both paths.
+MeshImportResult weld_mesh(FlatMesh raw, std::uint32_t source_node);
+
 // ─── Boolean ops (via Manifold) ───────────────────────────────────────
 
 enum class BoolOp { Union, Difference, Intersect };

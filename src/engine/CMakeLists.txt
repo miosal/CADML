@@ -9,6 +9,7 @@ add_library(cadml_engine
     src/flat_gltf.cpp
     src/flat_mesh_cache.cpp
     src/flat_stl.cpp
+    src/flat_stl_import.cpp
 )
 
 target_include_directories(cadml_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

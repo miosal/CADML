@@ -5,7 +5,9 @@
 
 #include "flat_geometry.hpp"
 #include "flat_mesh_cache_internal.hpp"
+#include "flat_stl_import.hpp"
 
+#include <cadml/base64.hpp>
 #include <cadml/expression.hpp>
 #include <cadml/selector.hpp>
 
@@ -391,6 +393,50 @@ FlatMesh eval_instance(const Document& doc, const Node& inst_node,
                         FlatMeshCache* cache,
                         int depth);
 
+// <stl> leaf — decode the embedded STL blob, weld it into a manifold
+// solid, and surface any non-manifold status as a diagnostic. The bundler
+// lowers an authoring `src=` path into the base64 `data=` read here, so the
+// engine itself never touches the filesystem (keeping eval pure and the
+// flat document self-contained). A non-watertight import still returns its
+// best-effort mesh so the user sees the geometry alongside the warning.
+FlatMesh eval_stl(const Document& doc, const Node& n,
+                   std::vector<FlatEvalError>& warnings)
+{
+    const auto& a = std::get<StlAttrs>(n.attrs);
+    if (a.data.empty()) {
+        warnings.push_back({
+            a.src.empty()
+                ? "stl: no geometry — set `data` (base64 STL) or a `src` path"
+                  " the bundler can resolve"
+                : "stl: `src=\"" + a.src + "\"` was not embedded; compile the"
+                  " document so the bundler inlines the file",
+            n.source });
+        return {};
+    }
+    if (a.encoding != "base64") {
+        warnings.push_back({
+            "stl: unsupported encoding `" + a.encoding + "` (only `base64`)",
+            n.source });
+        return {};
+    }
+    const auto bytes = base64_decode(a.data);
+    if (!bytes) {
+        warnings.push_back({ "stl: `data` is not valid base64", n.source });
+        return {};
+    }
+    auto parsed = detail::parse_stl(*bytes);
+    if (!parsed.ok) {
+        warnings.push_back({ "stl: " + parsed.error, n.source });
+        return {};
+    }
+    auto welded = detail::weld_mesh(std::move(parsed.mesh),
+                                    node_index(doc, n));
+    if (!welded.ok) {
+        warnings.push_back({ "stl: " + welded.error, n.source });
+    }
+    return welded.mesh;
+}
+
 // Single-child dispatch: returns the mesh produced by `child`, whether
 // it's a primitive (extrude/revolve/booleans), a wrapping <group>, or
 // something we can't render (returns empty mesh in that case). Shared
@@ -422,6 +468,8 @@ FlatMesh eval_node(const Document& doc, const Node& child,
             // caller params); the def's own geometry then evaluates in a
             // fresh scope where def-defaults + override RESULTS are bound.
             return eval_instance(doc, child, e, warnings, cache, depth);
+        case NodeType::Stl:
+            return eval_stl(doc, child, warnings);
         case NodeType::Extrude:
         case NodeType::Revolve:
         case NodeType::Sweep:

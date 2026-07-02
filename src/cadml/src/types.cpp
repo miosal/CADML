@@ -18,8 +18,8 @@ struct BuiltinEntry {
     NodeType         type;
 };
 
-constexpr std::array<BuiltinEntry, 30> kBuiltins = {{
-    // Structural (8)
+constexpr std::array<BuiltinEntry, 31> kBuiltins = {{
+    // Structural (9)
     { "assembly",   NodeType::Assembly },
     { "connect",    NodeType::Connect  },
     { "def",        NodeType::Def      },
@@ -40,6 +40,8 @@ constexpr std::array<BuiltinEntry, 30> kBuiltins = {{
     { "loft",       NodeType::Loft     },
     { "revolve",    NodeType::Revolve  },
     { "sweep",      NodeType::Sweep    },
+    // Mesh import (1)
+    { "stl",        NodeType::Stl      },
     // Booleans (3) + convex hull
     { "difference", NodeType::Difference },
     { "hull",       NodeType::Hull       },

@@ -73,7 +73,7 @@ the body string before pugixml sees it, so multiple top-level siblings
 parse as a tree. The synthetic root is then unwrapped — `Document::nodes`
 holds the children of the synthetic root, not the root itself.
 
-**Allowed elements** are the 30 reserved built-ins (see spec §4.3) plus
+**Allowed elements** are the 31 reserved built-ins (see spec §4.3) plus
 any import alias or local `<def>` name. Unknown element names produce
 a `Vocabulary` parse error, *except* during initial parsing where the
 single-file vocabulary check is deferred — the full check runs in the
@@ -216,7 +216,7 @@ right file).
 For each file in the import set, build a map of `element_name → kind`
 where `kind` is one of:
 
-- `BuiltIn` — one of the 30 reserved names.
+- `BuiltIn` — one of the 31 reserved names.
 - `Def` — a local `<def name="...">` declared in this file.
 - `ImportAlias` — an `import "..." as <name>` declaration.
 

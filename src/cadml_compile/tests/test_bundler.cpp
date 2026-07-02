@@ -211,6 +211,41 @@ TEST(Bundler, ExtrudeDefaultsAcceptedSemanticallyEquivalent) {
     EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
 }
 
+// ─── <stl> source validation ────────────────────────────────────────
+
+TEST(Bundler, StlBothSourcesRejected) {
+    // Spec: the mesh comes from exactly one source. Both set previously
+    // compiled clean and eval silently ignored `src`.
+    auto r = cs(
+        "version 0.1\n"
+        "<part><stl src=\"cube.stl\" data=\"AAAA\"/></part>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("both `src` and `data`"),
+              std::string::npos);
+    EXPECT_EQ(r.errors[0].category, CompileError::Schema);
+}
+
+TEST(Bundler, StlNoSourceRejected) {
+    // Bare <stl/> previously compiled clean and only warned at eval with
+    // an empty mesh.
+    auto r = cs("version 0.1\n<part><stl/></part>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("no mesh source"), std::string::npos);
+    EXPECT_EQ(r.errors[0].category, CompileError::Schema);
+}
+
+TEST(Bundler, StlSrcInSingleFileModeRejected) {
+    // compile_string with no base_dir (the WASM bindings path) cannot
+    // resolve external references: an unresolvable import is a compile
+    // error, and <stl src> must behave the same rather than compiling
+    // clean and rendering an empty mesh at eval.
+    auto r = cs("version 0.1\n<part><stl src=\"cube.stl\"/></part>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("no base directory"),
+              std::string::npos);
+    EXPECT_EQ(r.errors[0].category, CompileError::Import);
+}
+
 TEST(Bundler, CutSurvivesIntoFlatOutput) {
     // <cut> stays in the flat output (engine resolves at evaluate time
     // because pivot-edge positioning needs target bbox).

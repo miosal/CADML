@@ -27,12 +27,13 @@ recipes on top.
 
 ---
 
-## The 30 reserved built-in elements
+## The 31 reserved built-in elements
 
 ```
 Structural (9):       part def assembly connect port group script for svg
 2D primitives (4):    circle rect path sketch
 2D → 3D (5):          extrude revolve sweep loft helix
+Mesh import (1):      stl
 Booleans + hull (4):  union difference intersect hull
 Modifiers (5):        fillet chamfer shell cut pattern
 Flat-output (3):      param sources source     (compiler-emitted)
@@ -607,7 +608,7 @@ then difference.
    cause is missing overshoot (Recipe 6) or a non-manifold input
    (e.g., a `<hull>` of a single degenerate solid).
 4. If the failure is "unknown element name," you wrote something
-   that's not in the 30 reserved set (top of this file) and not an
+   that's not in the 31 reserved set (top of this file) and not an
    import alias or local `<def>`. Re-read the anti-patterns block
    in [implementation-notes.md](implementation-notes.md).
 5. Compare against an existing example — `hex-bolt.cadml` exercises

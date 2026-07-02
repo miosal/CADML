@@ -363,7 +363,7 @@ helpful diagnostic listing nearby valid names.
 
 ### 4.3 Reserved built-in element names
 
-For CADML 0.1, the following 30 names are reserved and cannot be used as
+For CADML 0.1, the following 31 names are reserved and cannot be used as
 import aliases or `<def>` names:
 
 **Structural (9):**
@@ -374,6 +374,9 @@ import aliases or `<def>` names:
 
 **2D-to-3D (5):**
 `extrude`, `revolve`, `sweep`, `loft`, `helix`
+
+**Mesh import (1):**
+`stl`
 
 **Booleans + hull (4):**
 `union`, `difference`, `intersect`, `hull`
@@ -813,7 +816,57 @@ emits a warning.
 | `taper` | number expr | `0` | Per-turn radius change (positive = expanding spiral) |
 | `direction` | enum | `ccw` | `ccw` or `cw` |
 
-### 5.4 Booleans
+### 5.4 Mesh import
+
+`<stl>` imports a triangle mesh from an STL blob and welds it into a solid
+that composes with the booleans (§5.5) and hull like any other 3D leaf — no
+special-casing. It is the mesh-native counterpart to importing a B-rep
+model: take an existing part and edit it with CSG.
+
+The mesh comes from exactly one source:
+
+- **`src`** — a path to an `.stl` file, resolved relative to the document
+  the same way an `import` is (§6.1). This is the authoring form; it keeps
+  the source lean. The bundler reads the file and lowers it to the `data`
+  form below, so the flat document is self-contained and the engine never
+  reads from the filesystem. Absolute paths, and paths that escape the
+  project root, are rejected.
+- **`data`** — the STL bytes embedded directly, encoded per `encoding`.
+  This is the self-contained / single-file form (and what `src` compiles
+  to). `base64` is the only encoding in 0.1.
+
+Both binary and ASCII STL are accepted; per-facet normals are ignored and
+recomputed from geometry. On import the mesh is passed through the CSG
+kernel's vertex merge so a clean, watertight STL becomes a valid
+2-manifold. If the merged mesh is **not** a valid manifold (holes,
+non-manifold edges, inconsistent winding — common in scans) the engine
+reports it as an evaluation diagnostic with the node's source location and
+still yields the best-effort mesh; it does **not** attempt repair.
+
+STL is unitless and carries no placement — position and scale the imported
+mesh with an enclosing `<group transform="…">` (§5.1), not a bespoke
+attribute.
+
+```xml
+<union>
+  <stl src="cube.stl"/>
+  <group transform="translate(10, 10, 10)">
+    <extrude height="20"><circle r="4"/></extrude>   <!-- a boss poking out -->
+  </group>
+</union>
+```
+
+| Attribute | Type | Default | Meaning |
+|---|---|---|---|
+| `src` | path | — | `.stl` file, resolved relative to the document (authoring form) |
+| `data` | string | — | STL bytes embedded per `encoding` (self-contained form) |
+| `encoding` | enum | `base64` | Encoding of `data`; `base64` only in 0.1 |
+
+Intrinsic edits of the imported mesh itself (reshaping an existing feature)
+are out of scope for 0.1 — `<stl>` is a geometry source for compositing,
+not a mesh editor.
+
+### 5.5 Booleans
 
 #### `<union>`
 
@@ -848,7 +901,7 @@ with multiple children the hull spans them all.
 Implemented via the underlying CSG library's hull operation; non-manifold or
 degenerate inputs produce a warning and an empty mesh.
 
-### 5.5 Modifiers
+### 5.6 Modifiers
 
 #### `<fillet radius="" [select=all]>`
 

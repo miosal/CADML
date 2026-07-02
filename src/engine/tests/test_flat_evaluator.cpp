@@ -4,6 +4,7 @@
 #include <cadml/engine/flat_evaluator.hpp>
 #include <cadml/engine/flat_check.hpp>
 
+#include <cadml/base64.hpp>            // shared encoder for `data=` tests
 #include <cadml/parser.hpp>            // libcadml ??? cadml::parse
 #include <cadml/compile/bundler.hpp>   // libcadml_compile ??? convenience
 
@@ -19,6 +20,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -5105,4 +5107,268 @@ TEST(Flat3mfExport, GeometryDeterministicAcrossRuns) {
     // are fixed string constants.
     EXPECT_EQ(entries1["[Content_Types].xml"], entries2["[Content_Types].xml"]);
     EXPECT_EQ(entries1["_rels/.rels"],          entries2["_rels/.rels"]);
+}
+
+// ─── <stl> mesh import (STL blob → welded manifold operand) ───────────
+//
+// The imported mesh must behave as a first-class 3D leaf that unions /
+// differences / intersects with the CSG primitives, welded on import so a
+// clean STL becomes a valid manifold and a dirty one is reported rather
+// than crashing. These drive the whole pipeline: compile (the bundler
+// inlines the referenced .stl into a base64 `data=`) then evaluate.
+
+#include <cadml/engine/flat_analysis.hpp>   // flat_mass_properties
+#include <cstdint>
+#include <cstring>
+
+namespace {
+
+void stl_put_f32(std::string& s, float f) { char b[4]; std::memcpy(b, &f, 4); s.append(b, 4); }
+void stl_put_u32(std::string& s, std::uint32_t v) { char b[4]; std::memcpy(b, &v, 4); s.append(b, 4); }
+
+// Binary STL of an axis-aligned cube [0,size]^3 with outward-facing,
+// consistently-wound triangles (a valid 2-manifold). `drop_last` omits the
+// final triangle to synthesise a non-watertight mesh (a triangular hole).
+std::string make_cube_stl(double size, bool drop_last = false) {
+    const float s = static_cast<float>(size);
+    const float v[8][3] = {
+        {0,0,0},{s,0,0},{s,s,0},{0,s,0},{0,0,s},{s,0,s},{s,s,s},{0,s,s}};
+    const int tri[12][3] = {
+        {0,3,2},{0,2,1},  {4,5,6},{4,6,7},  {0,1,5},{0,5,4},
+        {3,7,6},{3,6,2},  {0,4,7},{0,7,3},  {1,2,6},{1,6,5}};
+    const std::uint32_t n = drop_last ? 11 : 12;
+    std::string out(80, '\0');
+    stl_put_u32(out, n);
+    for (std::uint32_t t = 0; t < n; ++t) {
+        stl_put_f32(out, 0); stl_put_f32(out, 0); stl_put_f32(out, 0);  // normal
+        for (int k = 0; k < 3; ++k)
+            for (int c = 0; c < 3; ++c) stl_put_f32(out, v[tri[t][k]][c]);
+        out.push_back('\0'); out.push_back('\0');                       // attr
+    }
+    return out;
+}
+
+// ASCII STL of the same cube (exercises the ASCII parse path).
+std::string make_cube_stl_ascii(double size) {
+    const double s = size;
+    const double v[8][3] = {
+        {0,0,0},{s,0,0},{s,s,0},{0,s,0},{0,0,s},{s,0,s},{s,s,s},{0,s,s}};
+    const int tri[12][3] = {
+        {0,3,2},{0,2,1},  {4,5,6},{4,6,7},  {0,1,5},{0,5,4},
+        {3,7,6},{3,6,2},  {0,4,7},{0,7,3},  {1,2,6},{1,6,5}};
+    std::string out = "solid cube\n";
+    for (auto& t : tri) {
+        out += "  facet normal 0 0 0\n    outer loop\n";
+        for (int k = 0; k < 3; ++k)
+            out += "      vertex " + std::to_string(v[t[k]][0]) + " " +
+                   std::to_string(v[t[k]][1]) + " " +
+                   std::to_string(v[t[k]][2]) + "\n";
+        out += "    endloop\n  endfacet\n";
+    }
+    return out + "endsolid cube\n";
+}
+
+// Compile a single-part document that composes an imported cube.stl with a
+// cylinder (an extruded circle) via `op`, then evaluate it.
+FlatEvalResult eval_stl_op(std::string_view op, const std::string& stl_bytes) {
+    const std::string doc =
+        "version 0.1\n"
+        "<part name=\"p\">\n"
+        "  <" + std::string(op) + ">\n"
+        "    <stl src=\"cube.stl\"/>\n"
+        "    <group transform=\"translate(10, 10, 10)\">\n"
+        "      <extrude height=\"20\"><circle r=\"4\"/></extrude>\n"
+        "    </group>\n"
+        "  </" + std::string(op) + ">\n"
+        "</part>\n";
+    std::vector<cadml::compile::InMemoryFile> files = {
+        { "part.cadml", doc }, { "cube.stl", stl_bytes }};
+    auto cr = cadml::compile::compile_in_memory(files, "part.cadml");
+    EXPECT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
+    return evaluate_flat(cr.document);
+}
+
+}  // namespace
+
+TEST(FlatStlImport, UnionWithCylinderIsValidManifold) {
+    auto r = eval_stl_op("union", make_cube_stl(20.0));
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_FALSE(any_warning_contains(r, "not a valid manifold"));
+    ASSERT_EQ(r.parts.size(), 1u);
+    EXPECT_GT(r.parts[0].mesh.triangle_count(), 12u);   // more than the cube alone
+    const double vol = flat_mass_properties(r.parts[0].mesh).volume_mm3;
+    EXPECT_TRUE(std::isfinite(vol));
+    // cube (8000) + the exposed 10mm of an r=4 cylinder (~502.7); strictly
+    // between the cube alone and the cube + a full 20mm cylinder (~1005).
+    EXPECT_GT(vol, 8000.0);
+    EXPECT_LT(vol, 9010.0);
+}
+
+TEST(FlatStlImport, DifferenceCarvesValidManifold) {
+    auto r = eval_stl_op("difference", make_cube_stl(20.0));
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_FALSE(any_warning_contains(r, "not a valid manifold"));
+    ASSERT_EQ(r.parts.size(), 1u);
+    const double vol = flat_mass_properties(r.parts[0].mesh).volume_mm3;
+    EXPECT_TRUE(std::isfinite(vol));
+    // cube minus a 10mm-deep blind r=4 bore (~502.7).
+    EXPECT_GT(vol, 7000.0);
+    EXPECT_LT(vol, 8000.0);
+}
+
+TEST(FlatStlImport, IntersectionProducesValidManifold) {
+    auto r = eval_stl_op("intersect", make_cube_stl(20.0));
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_FALSE(any_warning_contains(r, "not a valid manifold"));
+    ASSERT_EQ(r.parts.size(), 1u);
+    const double vol = flat_mass_properties(r.parts[0].mesh).volume_mm3;
+    EXPECT_TRUE(std::isfinite(vol));
+    // just the embedded 10mm of the r=4 cylinder (~502.7).
+    EXPECT_GT(vol, 300.0);
+    EXPECT_LT(vol, 750.0);
+}
+
+TEST(FlatStlImport, AsciiStlImports) {
+    auto r = eval_stl_op("union", make_cube_stl_ascii(20.0));
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_FALSE(any_warning_contains(r, "not a valid manifold"));
+    EXPECT_GT(r.parts[0].mesh.triangle_count(), 12u);
+}
+
+TEST(FlatStlImport, NonWatertightWarnsWithoutCrashing) {
+    // A cube missing one triangle is not a closed 2-manifold: detect and
+    // report through the diagnostic channel, do not crash or throw.
+    auto r = eval_stl_op("union", make_cube_stl(20.0, /*drop_last=*/true));
+    EXPECT_TRUE(any_warning_contains(r, "not a valid manifold"));
+}
+
+TEST(FlatStlImport, TrianglesAttributedToStlNode) {
+    // Per-triangle source attribution is a first-class invariant: every
+    // imported triangle must map to the <stl> node (click-to-source,
+    // cadmltopo, glTF extras), not to node 0 / the enclosing <part>.
+    std::vector<cadml::compile::InMemoryFile> files = {
+        { "part.cadml",
+          "version 0.1\n<part name=\"p\"><stl src=\"cube.stl\"/></part>\n" },
+        { "cube.stl", make_cube_stl(10.0) }};
+    auto cr = cadml::compile::compile_in_memory(files, "part.cadml");
+    ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
+
+    std::uint32_t stl_node = 0;
+    for (std::size_t i = 0; i < cr.document.nodes.size(); ++i) {
+        if (cr.document.nodes[i].type == NodeType::Stl) {
+            stl_node = static_cast<std::uint32_t>(i);
+        }
+    }
+    ASSERT_NE(stl_node, 0u);   // node 0 is the <part>
+
+    auto r = evaluate_flat(cr.document);
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    ASSERT_EQ(r.parts.size(), 1u);
+    const auto& m = r.parts[0].mesh;
+    ASSERT_EQ(m.triangle_node.size(), m.triangle_count());
+    for (auto src : m.triangle_node) {
+        EXPECT_EQ(src, stl_node);
+    }
+}
+
+TEST(FlatStlImport, BestEffortMeshKeepsSizeInvariants) {
+    // The non-watertight (best-effort) path must still uphold the
+    // FlatMesh size invariants — normals per vertex, triangle_node per
+    // triangle, attributed to the <stl> node — or merge_mesh with a
+    // native sibling misaligns attribution for the whole part.
+    std::vector<cadml::compile::InMemoryFile> files = {
+        { "part.cadml",
+          "version 0.1\n<part name=\"p\"><stl src=\"holed.stl\"/></part>\n" },
+        { "holed.stl", make_cube_stl(10.0, /*drop_last=*/true) }};
+    auto cr = cadml::compile::compile_in_memory(files, "part.cadml");
+    ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
+
+    std::uint32_t stl_node = 0;
+    for (std::size_t i = 0; i < cr.document.nodes.size(); ++i) {
+        if (cr.document.nodes[i].type == NodeType::Stl) {
+            stl_node = static_cast<std::uint32_t>(i);
+        }
+    }
+    ASSERT_NE(stl_node, 0u);
+
+    auto r = evaluate_flat(cr.document);
+    EXPECT_TRUE(any_warning_contains(r, "not a valid manifold"));
+    ASSERT_EQ(r.parts.size(), 1u);
+    const auto& m = r.parts[0].mesh;
+    ASSERT_EQ(m.triangle_node.size(), m.triangle_count());
+    ASSERT_EQ(m.normals.size(), m.vertices.size());
+    for (auto src : m.triangle_node) {
+        EXPECT_EQ(src, stl_node);
+    }
+}
+
+TEST(FlatStlImport, BinaryNonFiniteCoordinateIsHardError) {
+    // A NaN coordinate is not best-effort-recoverable geometry: it must be
+    // rejected in the reader (matching the ASCII path) so it can never
+    // reach exported meshes through the non-manifold fallback.
+    std::string stl = make_cube_stl(10.0);
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    std::memcpy(stl.data() + 84 + 12, &nan, 4);   // first vertex, x coord
+    auto r = eval_stl_op("union", stl);
+    EXPECT_TRUE(any_warning_contains(r, "non-finite vertex coordinate"));
+    // The import contributes nothing — only the native cylinder remains,
+    // and no NaN survives into the part mesh.
+    ASSERT_EQ(r.parts.size(), 1u);
+    for (const auto& v : r.parts[0].mesh.vertices) {
+        EXPECT_TRUE(std::isfinite(v.x) && std::isfinite(v.y) &&
+                    std::isfinite(v.z));
+    }
+}
+
+TEST(FlatStlImport, AsciiNonFiniteCoordinateIsHardError) {
+    std::string stl = make_cube_stl_ascii(10.0);
+    const auto pos = stl.find("vertex ");
+    ASSERT_NE(pos, std::string::npos);
+    stl.replace(pos, 7, "vertex nan ");   // first coord becomes `nan`
+    auto r = eval_stl_op("union", stl);
+    EXPECT_TRUE(any_warning_contains(r, "malformed vertex coordinate"));
+    ASSERT_EQ(r.parts.size(), 1u);
+    for (const auto& v : r.parts[0].mesh.vertices) {
+        EXPECT_TRUE(std::isfinite(v.x) && std::isfinite(v.y) &&
+                    std::isfinite(v.z));
+    }
+}
+
+TEST(FlatStlImport, EmbeddedBase64DataForm) {
+    // The self-contained `data=` form the bundler emits can also be
+    // authored directly. base64 of a small binary cube, inline.
+    const std::string b64 = cadml::base64_encode(make_cube_stl(10.0));
+    const std::string doc =
+        "version 0.1\n<part name=\"p\"><stl data=\"" + b64 + "\"/></part>\n";
+    auto cr = cadml::compile::compile_string(doc);
+    ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
+    auto r = evaluate_flat(cr.document);
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    ASSERT_EQ(r.parts.size(), 1u);
+    EXPECT_EQ(r.parts[0].mesh.triangle_count(), 12u);   // welded cube
+    EXPECT_NEAR(flat_mass_properties(r.parts[0].mesh).volume_mm3, 1000.0, 1e-6);
+}
+
+TEST(FlatStlImport, MalformedBase64DataIsDiagnosticNotCrash) {
+    // Hostile/corrupt `data` must degrade to a diagnostic and an empty
+    // mesh — never a crash or partial decode reaching the geometry.
+    auto cr = cadml::compile::compile_string(
+        "version 0.1\n<part name=\"p\"><stl data=\"!!!not-base64!!!\"/></part>\n");
+    ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
+    auto r = evaluate_flat(cr.document);
+    EXPECT_TRUE(any_warning_contains(r, "not valid base64"));
+    ASSERT_EQ(r.parts.size(), 1u);
+    EXPECT_EQ(r.parts[0].mesh.triangle_count(), 0u);
+}
+
+TEST(FlatStlImport, MissingSourceFileIsCompileError) {
+    std::vector<cadml::compile::InMemoryFile> files = {
+        { "part.cadml",
+          "version 0.1\n<part name=\"p\"><stl src=\"nope.stl\"/></part>\n" }};
+    auto cr = cadml::compile::compile_in_memory(files, "part.cadml");
+    EXPECT_FALSE(cr.ok());
+    EXPECT_TRUE(std::any_of(cr.errors.begin(), cr.errors.end(),
+        [](const cadml::compile::CompileError& e) {
+            return e.message.find("cannot find referenced file") != std::string::npos;
+        }));
 }
