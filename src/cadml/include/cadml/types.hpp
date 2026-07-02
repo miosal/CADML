@@ -174,16 +174,61 @@ enum class NodeType {
     Unknown,
 };
 
-// Convert an element name to its NodeType. Returns Unknown if the name
-// is not a built-in. (Instance is never returned here — that's a
-// parser-side decision.)
+// Language-spec version as a comparable (major, minor) pair. Patch
+// components never affect vocabulary (spec §15.1: patch = no new
+// elements), so they are not represented.
+struct SpecVersion {
+    int major = 0;
+    int minor = 1;
+
+    friend constexpr bool operator==(SpecVersion a, SpecVersion b) {
+        return a.major == b.major && a.minor == b.minor;
+    }
+    friend constexpr bool operator<(SpecVersion a, SpecVersion b) {
+        return a.major != b.major ? a.major < b.major : a.minor < b.minor;
+    }
+    friend constexpr bool operator<=(SpecVersion a, SpecVersion b) {
+        return a == b || a < b;
+    }
+};
+
+inline constexpr SpecVersion kSpecV01{0, 1};
+inline constexpr SpecVersion kSpecV02{0, 2};
+
+// The newest spec version this implementation knows. Every version-gated
+// surface (reserved-name sets, the compiler's version acceptance check)
+// derives from the `since` column of the built-in table and this value.
+inline constexpr SpecVersion kSpecLatest = kSpecV02;
+
+// Parse the leading "major.minor" of a `version` declaration (accepts
+// the normalised "0.2.0" form DocumentMeta stores as well as a bare
+// "0.2"). Unparseable input yields the conservative kSpecV01 — the
+// smallest vocabulary — and is separately rejected by the compiler's
+// version acceptance check.
+SpecVersion spec_version_from_string(std::string_view version);
+
+// Convert an element name to its NodeType, as seen by a document that
+// declares `spec`: names introduced by a newer spec version return
+// Unknown, upholding the §15.2 pinning rule (a 0.1 file's namespace
+// cannot be broken by built-ins added later). Returns Unknown if the
+// name is not a built-in at all. (Instance is never returned here —
+// that's a parser-side decision.)
+NodeType node_type_from_builtin_name(std::string_view name, SpecVersion spec);
+
+// Latest-spec view — for tooling that is not validating a specific
+// document (serializer tables, editor surfaces, diagnostics).
 NodeType node_type_from_builtin_name(std::string_view name);
+
+// The spec version that introduced a built-in name; nullopt if the name
+// is not a built-in. Lets diagnostics say "requires version 0.2" when a
+// document written against an older spec uses a newer element.
+std::optional<SpecVersion> builtin_since(std::string_view name);
 
 // Inverse: returns the canonical built-in name, or empty for Instance/
 // Unknown.
 std::string_view builtin_name_from_node_type(NodeType type);
 
-// Whether this type is one of the 28 reserved built-in element names.
+// Whether this type is one of the reserved built-in element names.
 bool is_builtin(NodeType type);
 
 // ────────────────────────────────────────────────────────────────────────

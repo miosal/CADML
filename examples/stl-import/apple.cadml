@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "A sphere with a bite taken out of it, in the spirit of a certain fruit-company logo. Both the body and the bite are the SAME imported STL sphere (sphere.stl): the body arrives at the origin, and a second, scaled-down copy is positioned at the right rim and subtracted with a boolean <difference>. Demonstrates that imported meshes compose with each other through CSG — the bite tool is itself an imported mesh, not a native primitive."
 

@@ -127,6 +127,23 @@ bool key_escapes_root(std::string_view key) {
            (!key.empty() && key.front() == '/');
 }
 
+// Spec-version acceptance (§15.3): true iff `v` names a spec line this
+// compiler implements (0.1.x or 0.2.x — patch digits are free, since a
+// patch never adds vocabulary). Applied to the entry document and to
+// every imported file. Acceptance only gates *recognition*; each file
+// is separately VALIDATED against its own declared version's reserved
+// set at parse time (§15.2 pinning).
+bool is_supported_spec_version(const std::string& v) {
+    const auto spec = cadml::spec_version_from_string(v);
+    const bool known_line =
+        spec == cadml::kSpecV01 || spec == cadml::kSpecV02;
+    const bool well_formed =
+        v == "0.1" || v == "0.2" ||
+        (v.size() >= 4 && (v.compare(0, 4, "0.1.") == 0 ||
+                           v.compare(0, 4, "0.2.") == 0));
+    return known_line && well_formed;
+}
+
 // ─── Lua module wrapping ─────────────────────────────────────────────
 //
 // Imported `.lua` files are synthesised into `<script>` elements at the
@@ -246,6 +263,11 @@ struct ImportContext {
     // used so diamond imports reuse a single SourceFileId instead of
     // reparsing the file twice. Never erased.
     std::unordered_map<std::string, SourceFileId> seen;
+    // The ENTRY document's declared spec version. The flat output
+    // carries the entry's version, so no imported file may be written
+    // against a newer spec (its nodes would re-parse against a reserved
+    // set that cannot see them).
+    SpecVersion entry_spec = kSpecLatest;
     std::vector<SourceFile>   source_files;    // by id
     std::vector<CompileError> errors;
     std::vector<CompileError> warnings;
@@ -534,6 +556,36 @@ void resolve_imports_into(Document& host, ImportContext& ctx,
             ctx.errors.push_back(std::move(ce));
         }
         if (!sub.ok()) {
+            ctx.visited.erase(key);
+            continue;
+        }
+
+        // Spec-version rules for imported files (§15.3): the declared
+        // version must be one this compiler implements, and it may not
+        // be newer than the entry document's — the flat output declares
+        // the entry's version, so defs using newer vocabulary would
+        // re-parse against a reserved set that cannot see them.
+        const auto& sub_version = sub.document.meta.version;
+        if (!sub_version.empty() && !is_supported_spec_version(sub_version)) {
+            ctx.push_error(CompileError::Schema,
+                "import: `" + imp.path + "` declares unrecognized spec"
+                " version `" + sub_version + "` — this compiler"
+                " implements 0.1.x and 0.2.x (see spec §15.3)",
+                imp.source);
+            ctx.visited.erase(key);
+            continue;
+        }
+        if (const auto sub_spec = spec_version_from_string(sub_version);
+            ctx.entry_spec < sub_spec) {
+            ctx.push_error(CompileError::Import,
+                "import: `" + imp.path + "` is written against spec"
+                " version " + std::to_string(sub_spec.major) + "." +
+                std::to_string(sub_spec.minor) + " but the entry document"
+                " declares " + std::to_string(ctx.entry_spec.major) + "." +
+                std::to_string(ctx.entry_spec.minor) + " — a document"
+                " cannot import files that require a newer spec; bump the"
+                " entry's `version` declaration",
+                imp.source);
             ctx.visited.erase(key);
             continue;
         }
@@ -1245,26 +1297,25 @@ bool parse_entry(CompileResult& result, std::string_view source) {
         result.errors.push_back(std::move(ce));
     }
     if (!parsed.ok()) return false;
-    // Per spec §15.3: a 0.1.x compiler accepts `version 0.1` and
-    // patch-level refinements (`0.1.0`, `0.1.1`, …) but rejects
-    // any other declaration so a future 0.2 file can't silently parse
-    // under 0.1 semantics. (Empty version is already rejected by the
-    // parser when the file has any content; that case won't reach
-    // here.)
-    if (!parsed.document.meta.version.empty()) {
-        const auto& v = parsed.document.meta.version;
-        const bool ok =
-            v == "0.1" ||
-            (v.size() >= 4 && v.compare(0, 4, "0.1.") == 0);
-        if (!ok) {
-            CompileError ce;
-            ce.category = CompileError::Schema;
-            ce.message  = "unrecognized spec version `" + v +
-                "` — this compiler implements 0.1.x only (see spec §15.3)";
-            ce.source = {};
-            result.errors.push_back(std::move(ce));
-            return false;
-        }
+    // Per spec §15.3: the compiler accepts every spec version it
+    // implements (0.1 and 0.2, plus patch-level refinements — patch
+    // releases add no vocabulary) and rejects any other declaration so
+    // a future 0.3 file can't silently parse under older semantics.
+    // Each file is still *validated* against its own declared version's
+    // reserved set (§15.2) — acceptance here only gates recognition.
+    // (Empty version is already rejected by the parser when the file
+    // has any content; that case won't reach here.)
+    if (!parsed.document.meta.version.empty() &&
+        !is_supported_spec_version(parsed.document.meta.version)) {
+        CompileError ce;
+        ce.category = CompileError::Schema;
+        ce.message  = "unrecognized spec version `" +
+            parsed.document.meta.version +
+            "` — this compiler implements 0.1.x and 0.2.x"
+            " (see spec §15.3)";
+        ce.source = {};
+        result.errors.push_back(std::move(ce));
+        return false;
     }
     result.document = std::move(parsed.document);
     return true;
@@ -1351,6 +1402,8 @@ CompileResult compile_string(std::string_view source,
         // it lives at the root, so its imports resolve relative to "".
         FilesystemProvider provider{ base_dir };
         ImportContext ctx;
+        ctx.entry_spec =
+            spec_version_from_string(result.document.meta.version);
         ctx.source_files = result.document.source_files;
         resolve_imports_into(result.document, ctx, provider,
                               /*importing_dir_key=*/"");
@@ -1422,6 +1475,7 @@ CompileResult compile_in_memory(const std::vector<InMemoryFile>& files,
     seed_entry_source(result, *entry_src.contents, entry_key);
 
     ImportContext ctx;
+    ctx.entry_spec = spec_version_from_string(result.document.meta.version);
     ctx.source_files = result.document.source_files;
     // Register the entry as file 0 in both maps so a self-import or a
     // diamond back to the entry is detected / reuses id 0.

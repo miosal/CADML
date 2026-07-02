@@ -87,7 +87,12 @@ struct [[nodiscard]] BodyResult {
     [[nodiscard]] bool ok() const { return errors.empty(); }
 };
 
+// `spec` selects the reserved built-in set the body is validated
+// against (§15.2 version pinning) — parse() passes the document's
+// declared version; the default is the latest spec, for tooling that
+// parses bare bodies without frontmatter context.
 [[nodiscard]] BodyResult parse_body(std::string_view body, SourceFileId file_id = 0,
-                      std::uint32_t body_line_offset = 1);
+                      std::uint32_t body_line_offset = 1,
+                      SpecVersion spec = kSpecLatest);
 
 }  // namespace cadml

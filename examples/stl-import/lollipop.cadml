@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Lollipop demonstrating <stl> mesh import: the candy head is an imported STL sphere (sphere.stl, welded into a manifold solid on import) and the stick is a native CADML cylinder. The two are combined with a boolean <union> — the imported mesh composes with CSG primitives like any other 3D leaf."
 

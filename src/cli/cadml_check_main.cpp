@@ -23,7 +23,7 @@ namespace {
 // on stderr (the user did something wrong).
 void print_usage(std::ostream& os) {
     os <<
-        "cadmlcheck - CADML 0.1 validation tool\n"
+        "cadmlcheck - CADML validation tool\n"
         "\n"
         "Usage:\n"
         "  cadmlcheck <entry.cadml> [options]\n"
