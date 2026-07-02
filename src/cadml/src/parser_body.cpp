@@ -256,6 +256,27 @@ NodeAttrs build_helix_attrs(const pugi::xml_node& n) {
     return a;
 }
 
+NodeAttrs build_stl_attrs(const pugi::xml_node& n) {
+    StlAttrs a;
+    a.src      = attr(n, "src");
+    a.data     = attr(n, "data");
+    a.encoding = attr_or(n, "encoding", "base64");
+    // `src` on <stl> is overloaded: authoring docs use it for the mesh
+    // file path, while bundled .fcadml docs carry the structural
+    // source-map back-reference ("file:line:col") every flat element
+    // has — the mesh itself was lowered into `data` by then. The range
+    // logic below already honours such a value as a back-reference
+    // (same `>= 2` acceptance); it must then NOT also count as a mesh
+    // path, or every re-parsed flat doc looks like it has two sources.
+    // Mirrors is_reserved_instance_attr, which keeps `src` structural
+    // on instances for the same reason (spec §10.7 idempotence).
+    unsigned file = 0, line = 0, col = 0;
+    if (std::sscanf(a.src.c_str(), "%u:%u:%u", &file, &line, &col) >= 2) {
+        a.src.clear();
+    }
+    return a;
+}
+
 NodeAttrs build_fillet_attrs(const pugi::xml_node& n) {
     FilletAttrs a;
     a.radius_expr = attr(n, "radius");
@@ -385,6 +406,8 @@ TypedAttrs classify(const pugi::xml_node& n) {
         case NodeType::Sweep:      return { bt, SweepAttrs{} };
         case NodeType::Loft:       return { bt, LoftAttrs{} };
         case NodeType::Helix:      return { bt, build_helix_attrs(n) };
+
+        case NodeType::Stl:        return { bt, build_stl_attrs(n) };
 
         case NodeType::Union:      return { bt, UnionAttrs{} };
         case NodeType::Difference: return { bt, DifferenceAttrs{} };

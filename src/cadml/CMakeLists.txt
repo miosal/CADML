@@ -3,6 +3,7 @@
 # against this.
 
 add_library(cadml_types STATIC
+    src/base64.cpp
     src/math.cpp
     src/types.cpp
     src/parser_frontmatter.cpp
@@ -28,6 +29,7 @@ target_link_libraries(cadml_types
 
 if (CADML_BUILD_TESTS)
     add_executable(cadml_types_tests
+        tests/test_base64.cpp
         tests/test_math.cpp
         tests/test_types.cpp
         tests/test_parser_frontmatter.cpp

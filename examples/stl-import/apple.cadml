@@ -1,0 +1,21 @@
+version 0.1
+units mm
+description "A sphere with a bite taken out of it, in the spirit of a certain fruit-company logo. Both the body and the bite are the SAME imported STL sphere (sphere.stl): the body arrives at the origin, and a second, scaled-down copy is positioned at the right rim and subtracted with a boolean <difference>. Demonstrates that imported meshes compose with each other through CSG — the bite tool is itself an imported mesh, not a native primitive."
+
+param bite-scale = 0.58            # bite sphere radius relative to the body (25mm)
+param bite-x     = 26              # push the bite sphere out to the right rim
+param bite-y     = 4               # nudge it slightly above the equator
+
+<part name="apple" color="#B33A3A">
+  <difference>
+    <!-- Body: the imported STL sphere, centred at the origin. -->
+    <stl src="sphere.stl"/>
+
+    <!-- Bite: the same sphere again, scaled down and shifted to the
+         right edge, then cut away. The transform chain scales about the
+         origin first (the mesh is centred there) and then translates. -->
+    <group transform="translate({bite-x}, {bite-y}, 0) scale({bite-scale}, {bite-scale}, {bite-scale})">
+      <stl src="sphere.stl"/>
+    </group>
+  </difference>
+</part>

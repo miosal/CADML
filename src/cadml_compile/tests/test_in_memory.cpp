@@ -2,6 +2,7 @@
 // Copyright 2026 miosal@cadml.org
 
 #include <cadml/compile/bundler.hpp>
+#include <cadml/constants.hpp>          // kMaxSourceBytes
 
 #include <gtest/gtest.h>
 
@@ -143,6 +144,80 @@ TEST(InMemory, RootAnchoredImportRejected) {
         }),
         "main.cadml");
     EXPECT_FALSE(r.ok());
+}
+
+// ─── Security: <stl src> reuses the import containment guards ───────
+// Regression pins for resolve_stl_imports — these all work by reusing
+// resolve_import_key / key_escapes_root and the provider size cap, and
+// must keep failing closed if that plumbing is ever refactored.
+
+TEST(InMemory, StlAbsolutePathRejected) {
+    auto r = compile_in_memory(
+        files({
+            { "main.cadml",
+              "version 0.1\n<part><stl src=\"/etc/passwd\"/></part>" },
+        }),
+        "main.cadml");
+    EXPECT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.category == CompileError::Import &&
+            e.message.find("absolute paths are not permitted")
+                != std::string::npos) found = true;
+    EXPECT_TRUE(found) << "absolute <stl src> must be refused before any read";
+}
+
+TEST(InMemory, StlParentEscapeRejected) {
+    auto r = compile_in_memory(
+        files({
+            { "main.cadml",
+              "version 0.1\n<part><stl src=\"../../escape.stl\"/></part>" },
+        }),
+        "main.cadml");
+    EXPECT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.category == CompileError::Import &&
+            e.message.find("outside the project root") != std::string::npos)
+            found = true;
+    EXPECT_TRUE(found) << "../ escape in <stl src> must be refused";
+}
+
+TEST(InMemory, StlOversizeSourceRejected) {
+    // One byte over kMaxSourceBytes: the provider reports too_large and
+    // the bundler surfaces the size limit instead of embedding 64 MiB.
+    auto r = compile_in_memory(
+        files({
+            { "big.stl", std::string(cadml::kMaxSourceBytes + 1, 's') },
+            { "main.cadml",
+              "version 0.1\n<part><stl src=\"big.stl\"/></part>" },
+        }),
+        "main.cadml");
+    EXPECT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.category == CompileError::Import &&
+            e.message.find("size limit") != std::string::npos) found = true;
+    EXPECT_TRUE(found) << "oversize <stl src> must be refused, not embedded";
+}
+
+TEST(InMemory, StlFlatOutputRecompilesClean) {
+    // The bundler emits <stl data=… src="file:line:col"> where `src` is
+    // the source-map back-reference every flat element carries — the
+    // mesh source was already lowered into `data`. Re-compiling the flat
+    // output must not read the back-reference as a second mesh source
+    // (spec §10.7 idempotence; the parser strips back-reference-shaped
+    // values from StlAttrs.src).
+    auto r = compile_in_memory(
+        files({
+            { "cube.stl", "opaque bytes; resolution just embeds them" },
+            { "main.cadml",
+              "version 0.1\n<part><stl src=\"cube.stl\"/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    auto r2 = compile_string(r.flat_text);
+    EXPECT_TRUE(r2.ok()) << (r2.errors.empty() ? "" : r2.errors[0].message);
 }
 
 // ─── Cycle detection works through the in-memory provider ───────────

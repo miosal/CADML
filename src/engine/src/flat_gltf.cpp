@@ -4,6 +4,8 @@
 #include <cadml/engine/flat_evaluator.hpp>
 #include <cadml/engine/flat_color.hpp>
 
+#include <cadml/base64.hpp>
+
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -15,6 +17,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -70,34 +73,6 @@ void append_u32(std::vector<std::uint8_t>& out, std::uint32_t u) {
 // views have alignment requirements (4 bytes for indices is common).
 void pad_to(std::vector<std::uint8_t>& out, std::size_t alignment) {
     while (out.size() % alignment) out.push_back(0);
-}
-
-std::string base64_encode(const std::vector<std::uint8_t>& data) {
-    static const char alphabet[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    std::string out;
-    out.reserve(((data.size() + 2) / 3) * 4);
-    std::size_t i = 0;
-    while (i + 3 <= data.size()) {
-        const std::uint32_t v = (static_cast<std::uint32_t>(data[i]) << 16) |
-                                  (static_cast<std::uint32_t>(data[i + 1]) << 8) |
-                                  static_cast<std::uint32_t>(data[i + 2]);
-        out.push_back(alphabet[(v >> 18) & 0x3F]);
-        out.push_back(alphabet[(v >> 12) & 0x3F]);
-        out.push_back(alphabet[(v >>  6) & 0x3F]);
-        out.push_back(alphabet[ v        & 0x3F]);
-        i += 3;
-    }
-    if (i < data.size()) {
-        const auto rem = data.size() - i;
-        std::uint32_t v = static_cast<std::uint32_t>(data[i]) << 16;
-        if (rem == 2) v |= static_cast<std::uint32_t>(data[i + 1]) << 8;
-        out.push_back(alphabet[(v >> 18) & 0x3F]);
-        out.push_back(alphabet[(v >> 12) & 0x3F]);
-        out.push_back(rem == 2 ? alphabet[(v >> 6) & 0x3F] : '=');
-        out.push_back('=');
-    }
-    return out;
 }
 
 // Find the originating <part> Node for `part` (by name). Returns
@@ -374,7 +349,9 @@ std::string export_gltf(const FlatEvalResult& result,
         buffer_obj.AddMember("byteLength",
             static_cast<std::uint64_t>(buffer.size()), alloc);
         const std::string uri =
-            "data:application/octet-stream;base64," + base64_encode(buffer);
+            "data:application/octet-stream;base64," +
+            base64_encode(std::string_view(
+                reinterpret_cast<const char*>(buffer.data()), buffer.size()));
         Value uri_val(uri.c_str(), alloc);
         buffer_obj.AddMember("uri", uri_val, alloc);
         Value buffers(kArrayType);

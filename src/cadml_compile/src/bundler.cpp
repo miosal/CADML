@@ -3,6 +3,7 @@
 
 #include <cadml/compile/bundler.hpp>
 
+#include <cadml/base64.hpp>
 #include <cadml/expression.hpp>
 #include <cadml/parser.hpp>
 #include <cadml/selector.hpp>
@@ -826,6 +827,84 @@ void validate_param_overrides(const Document& doc,
     }
 }
 
+// ─── <stl> source inlining ───────────────────────────────────────────
+//
+// An authoring `<stl src="mesh.stl">` is lowered to the self-contained
+// base64 `data=` form the engine reads (encoded via the shared
+// cadml/base64.hpp helper), so the flat document carries no external
+// asset references (and the filesystem-free engine — including the
+// WASM build — never has to resolve a path). This mirrors how imports and
+// Lua modules are inlined.
+
+// Resolve every <stl src="…"> through `provider`, reusing the import
+// machinery's containment + size guards, and replace `src` with the
+// embedded base64 `data`. Paths resolve relative to the directory of the
+// file that authored the node (recovered from the source-map table), the
+// same rule imports follow. `data`-form nodes are left untouched.
+template <SourceProvider P>
+void resolve_stl_imports(Document& doc, const P& provider,
+                          const std::vector<SourceFile>& source_files,
+                          std::vector<CompileError>& errors) {
+    // N nodes referencing the same file (two <stl> uses of one asset, or
+    // one <stl> cloned by pattern/for unrolling) read and encode it once
+    // per distinct resolved key. Only successes are memoised so every
+    // failing node still gets its own source-located error. Each node
+    // still embeds its own copy of the string — sharing one blob across
+    // nodes would be a document-format change (a `<sources>`-like table).
+    std::unordered_map<std::string, std::string> encoded_by_key;
+
+    for (auto& n : doc.nodes) {
+        if (n.dead || n.type != NodeType::Stl) continue;
+        auto& a = std::get<StlAttrs>(n.attrs);
+        if (!a.data.empty() || a.src.empty()) continue;
+
+        auto fail = [&](std::string msg) {
+            errors.push_back({ CompileError::Import, std::move(msg), n.source });
+        };
+
+        // SECURITY: reject absolute paths outright, exactly as imports do.
+        if (fs::path(a.src).is_absolute() ||
+            a.src.front() == '/' || a.src.front() == '\\') {
+            fail("stl: absolute paths are not permitted (`" + a.src +
+                 "`); use a path relative to the document");
+            continue;
+        }
+
+        std::string dir;
+        if (n.source.file != NO_FILE && n.source.file < source_files.size()) {
+            dir = dir_key_of(source_files[n.source.file].path);
+        }
+        const std::string key = resolve_import_key(a.src, dir);
+        if (key_escapes_root(key)) {
+            fail("stl: `" + a.src + "` resolves outside the project root");
+            continue;
+        }
+
+        if (const auto it = encoded_by_key.find(key);
+            it != encoded_by_key.end()) {
+            a.data     = it->second;
+            a.encoding = "base64";
+            a.src.clear();
+            continue;
+        }
+
+        const ReadResult rr = provider.read(key);
+        if (!rr.contents) {
+            fail(rr.too_large
+                     ? "stl: `" + a.src + "` exceeds the " +
+                           std::to_string(cadml::kMaxSourceBytes) +
+                           "-byte size limit"
+                     : "stl: cannot find referenced file `" + a.src + "`");
+            continue;
+        }
+
+        a.data     = base64_encode(*rr.contents);
+        a.encoding = "base64";
+        a.src.clear();
+        encoded_by_key.emplace(key, a.data);
+    }
+}
+
 // All composition constructs (<for>, <pattern>, <assembly>, <connect>,
 // mating instances) are now lowered by the bundler. Any remaining
 // instance with at/port outside an assembly context is an error.
@@ -898,6 +977,34 @@ void check_unsupported_constructs(const Document& doc,
                     "remove the attribute and wrap the extrude in a "
                     "<group transform=\"rotate(...)\"> to extrude along "
                     "a non-+z axis.");
+            }
+        }
+        // <stl> takes its mesh from exactly one source (spec §5.4).
+        // Both set would silently drop `src` at eval; neither set only
+        // surfaced as an eval-time warning plus an empty mesh. Reject
+        // both halves here, where the author can actually fix them.
+        // (This runs after resolve_stl_imports, which lowers a resolved
+        // `src` into `data` and clears `src` — a post-compile flat doc
+        // has one source and passes clean.)
+        if (n.type == NodeType::Stl) {
+            const auto& a = std::get<StlAttrs>(n.attrs);
+            const bool has_src  = !a.src.empty();
+            const bool has_data = !a.data.empty();
+            if (has_src && has_data) {
+                CompileError e;
+                e.category = CompileError::Schema;
+                e.message  = "<stl> has both `src` and `data`; the mesh"
+                             " comes from exactly one source — remove one";
+                e.source = n.source;
+                errors.push_back(std::move(e));
+            } else if (!has_src && !has_data) {
+                CompileError e;
+                e.category = CompileError::Schema;
+                e.message  = "<stl> has no mesh source; set `src` (a"
+                             " relative .stl path) or `data` (embedded"
+                             " base64 STL)";
+                e.source = n.source;
+                errors.push_back(std::move(e));
             }
         }
     }
@@ -1250,6 +1357,8 @@ CompileResult compile_string(std::string_view source,
         result.document.source_files = std::move(ctx.source_files);
         for (auto& e : ctx.errors)   result.errors.push_back(std::move(e));
         for (auto& w : ctx.warnings) result.warnings.push_back(std::move(w));
+        resolve_stl_imports(result.document, provider,
+                             result.document.source_files, result.errors);
     } else if (!result.document.imports.empty()) {
         // Single-file mode: imports declared but nowhere to resolve them.
         CompileError e;
@@ -1259,6 +1368,25 @@ CompileResult compile_string(std::string_view source,
                      " or pass base_dir";
         result.errors.push_back(std::move(e));
         return result;
+    } else {
+        // Single-file mode: an <stl src> is the same kind of external
+        // reference as an import — with no base directory it can never
+        // be resolved, so fail here (where the author can fix it) rather
+        // than compiling clean and rendering an empty mesh at eval.
+        for (const auto& n : result.document.nodes) {
+            if (n.dead || n.type != NodeType::Stl) continue;
+            const auto& a = std::get<StlAttrs>(n.attrs);
+            if (a.src.empty() || !a.data.empty()) continue;
+            CompileError e;
+            e.category = CompileError::Import;
+            e.message  = "stl: `src=\"" + a.src + "\"` cannot be resolved"
+                         " — no base directory supplied; use compile_file,"
+                         " compile_in_memory, or pass base_dir (or embed"
+                         " the mesh as base64 `data`)";
+            e.source = n.source;
+            result.errors.push_back(std::move(e));
+        }
+        if (!result.ok()) return result;
     }
 
     run_lowering(result, opts);
@@ -1304,6 +1432,8 @@ CompileResult compile_in_memory(const std::vector<InMemoryFile>& files,
     result.document.source_files = std::move(ctx.source_files);
     for (auto& e : ctx.errors)   result.errors.push_back(std::move(e));
     for (auto& w : ctx.warnings) result.warnings.push_back(std::move(w));
+    resolve_stl_imports(result.document, provider,
+                         result.document.source_files, result.errors);
 
     run_lowering(result, opts);
     return result;

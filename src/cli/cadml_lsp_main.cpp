@@ -59,6 +59,7 @@ constexpr SpecEntry kElements[] = {
     {"sweep", "3D sweep", "Sweeps a profile along a path.", "sweep>\n  $0\n</sweep>"},
     {"loft", "3D loft", "Lofts between ordered profiles.", "loft>\n  $0\n</loft>"},
     {"helix", "3D helix", "Creates a helical solid/path primitive.", "helix radius=\"$1\" pitch=\"$2\" turns=\"$3\"/>"},
+    {"stl", "STL mesh import", "Imports a triangle mesh from an STL file (src=) or embedded base64 (data=).", "stl src=\"$1\"/>"},
     {"union", "Boolean union", "Combines child solids.", "union>\n  $0\n</union>"},
     {"difference", "Boolean difference", "Subtracts later child solids from the first child solid.", "difference>\n  $0\n</difference>"},
     {"intersect", "Boolean intersection", "Keeps the shared volume of child solids.", "intersect>\n  $0\n</intersect>"},

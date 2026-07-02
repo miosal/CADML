@@ -154,6 +154,9 @@ enum class NodeType {
     // 2D-to-3D (5)
     Extrude, Revolve, Sweep, Loft, Helix,
 
+    // Mesh import (1) — an STL blob welded into a manifold solid
+    Stl,
+
     // Booleans (3) + convex hull
     Union, Difference, Intersect, Hull,
 
@@ -326,6 +329,25 @@ struct HelixAttrs {
     std::string direction = "ccw"; // "ccw" / "cw"
 };
 
+// Mesh import ─────────────────────────────────────────────────────────────
+
+// <stl> imports a triangle mesh from an STL blob and welds it into a
+// manifold solid that composes with the boolean/hull primitives like any
+// other 3D leaf. Exactly one source is expected:
+//   * `src`  — path to an .stl file, resolved relative to the document (the
+//              authoring form). The bundler reads it and lowers it to `data`
+//              so the flat document stays self-contained; the engine never
+//              touches the filesystem.
+//   * `data` — the STL bytes embedded directly, per `encoding` (the flat /
+//              single-file form). `base64` is the only encoding in 0.1.
+// Binary and ASCII STL are both accepted; per-facet normals are ignored and
+// recomputed. Placement/scaling is done with an enclosing <group transform>.
+struct StlAttrs {
+    std::string src;
+    std::string data;
+    std::string encoding = "base64";
+};
+
 // Booleans ───────────────────────────────────────────────────────────────
 
 struct UnionAttrs {};
@@ -429,7 +451,7 @@ using NodeAttrs = std::variant<
     SvgAttrs,
     CircleAttrs,  RectAttrs,       PathAttrs,       SketchAttrs,
     ExtrudeAttrs, RevolveAttrs,    SweepAttrs,      LoftAttrs,
-    HelixAttrs,
+    HelixAttrs,   StlAttrs,
     UnionAttrs,   DifferenceAttrs, IntersectAttrs,  HullAttrs,
     FilletAttrs,  ChamferAttrs,    ShellAttrs,      CutAttrs,
     PatternAttrs,

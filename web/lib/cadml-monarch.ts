@@ -32,6 +32,8 @@ const CADML_ELEMENTS = [
   'sketch', 'circle', 'rect', 'path',
   // 2D-to-3D
   'extrude', 'revolve', 'sweep', 'loft', 'helix',
+  // mesh import
+  'stl',
   // booleans + hull
   'union', 'difference', 'intersect', 'hull',
   // modifiers

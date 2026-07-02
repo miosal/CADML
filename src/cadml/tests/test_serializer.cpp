@@ -272,3 +272,33 @@ TEST(Serializer, AmpersandInValuesEscaped) {
     auto s = serialize(p.document);
     EXPECT_NE(s.find("a&amp;b"), std::string::npos);
 }
+
+TEST(Serializer, StlSrcRoundTrips) {
+    // Authoring form: a bare `src` path. Round-trips as-is (the bundler,
+    // not the parser/serializer, is what lowers `src` to `data`).
+    auto rt = round_trip(
+        "version 0.1\n"
+        "<part>\n"
+        "  <union>\n"
+        "    <stl src=\"cube.stl\"/>\n"
+        "  </union>\n"
+        "</part>\n");
+    expect_node_count(rt.a, rt.b);
+    ASSERT_EQ(rt.b.nodes[2].type, NodeType::Stl);
+    const auto& a = std::get<StlAttrs>(rt.b.nodes[2].attrs);
+    EXPECT_EQ(a.src, "cube.stl");
+    EXPECT_TRUE(a.data.empty());
+}
+
+TEST(Serializer, StlEmbeddedDataRoundTrips) {
+    // Flat / self-contained form: base64 `data`. The default `base64`
+    // encoding is elided on emit, so it must re-parse back to base64.
+    auto rt = round_trip(
+        "version 0.1\n"
+        "<part><stl data=\"QUJDRA==\"/></part>\n");
+    ASSERT_EQ(rt.b.nodes[1].type, NodeType::Stl);
+    const auto& a = std::get<StlAttrs>(rt.b.nodes[1].attrs);
+    EXPECT_EQ(a.data, "QUJDRA==");
+    EXPECT_EQ(a.encoding, "base64");
+    EXPECT_TRUE(a.src.empty());
+}

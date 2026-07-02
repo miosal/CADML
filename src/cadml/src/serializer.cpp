@@ -300,6 +300,12 @@ void emit_attrs(std::ostream& os, const Node& n) {
             emit_attr(os, "turns",      a.turns_expr);
             emit_attr_if(os, "taper",   a.taper_expr, "0");
             emit_attr_if(os, "direction", a.direction, "ccw");
+        } else if constexpr (std::is_same_v<A, StlAttrs>) {
+            emit_attr(os, "src",  a.src);
+            emit_attr(os, "data", a.data);
+            // Only meaningful alongside `data`; omit the default so an
+            // authoring `<stl src=...>` round-trips without noise.
+            if (!a.data.empty()) emit_attr_if(os, "encoding", a.encoding, "base64");
         } else if constexpr (std::is_same_v<A, FilletAttrs>) {
             emit_attr(os, "radius",     a.radius_expr);
             emit_attr_if(os, "select",  a.select, "all");
