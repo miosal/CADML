@@ -29,6 +29,10 @@ endforeach()
 # Language server: parser diagnostics over stdio (rapidjson for LSP JSON).
 add_executable(cadmllsp cadml_lsp_main.cpp)
 target_link_libraries(cadmllsp PRIVATE cadml_types rapidjson)
+# serverInfo.version reports the software version; project(VERSION …) in
+# the top-level CMakeLists.txt is its single source of truth.
+target_compile_definitions(cadmllsp PRIVATE
+    CADML_SOFTWARE_VERSION="${cadml_VERSION}")
 
 set(CADML_ALL_TOOLS
     cadmlc cadmlstl cadml3mf cadmlcheck cadmlbuild

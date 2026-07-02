@@ -29,6 +29,14 @@
 #include <io.h>
 #endif
 
+// Software version reported in the LSP initialize response. Injected by
+// the build from project(VERSION …) in the top-level CMakeLists.txt —
+// the single source of truth — with a fallback so non-CMake builds
+// (analysis tools, ad-hoc compiles) still link.
+#ifndef CADML_SOFTWARE_VERSION
+#define CADML_SOFTWARE_VERSION "unknown"
+#endif
+
 namespace {
 
 namespace rj = rapidjson;
@@ -350,7 +358,7 @@ private:
 
         rj::Value server_info(rj::kObjectType);
         server_info.AddMember("name", "cadmllsp", alloc);
-        server_info.AddMember("version", "0.1.0", alloc);
+        server_info.AddMember("version", CADML_SOFTWARE_VERSION, alloc);
         result.AddMember("serverInfo", server_info, alloc);
 
         rj::Value capabilities(rj::kObjectType);
