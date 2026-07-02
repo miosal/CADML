@@ -394,8 +394,12 @@ ImportParse parse_import_line(std::string_view line) {
 
     // Spec §4.4: import alias cannot collide with a built-in element name.
     // (Both the explicitly-given `as <alias>` and the filename-derived
-    // default are subject to this rule.)
-    if (node_type_from_builtin_name(decl.alias) != NodeType::Unknown) {
+    // default are subject to this rule.) Checked against the 0.1 baseline
+    // set here — the file's `version` may not have been read yet
+    // (frontmatter ordering is a style rule, not enforced), so names
+    // reserved only by newer spec versions are re-checked in
+    // parse_frontmatter once all lines are in.
+    if (node_type_from_builtin_name(decl.alias, kSpecV01) != NodeType::Unknown) {
         out.error = std::string(
             "import: alias `" + decl.alias +
             "` collides with a built-in element name. Use `as <other>` to"
@@ -576,6 +580,26 @@ FrontmatterResult parse_frontmatter(std::string_view source,
         out.warnings.push_back(std::move(w));
     };
 
+    // Aliases are validated against the 0.1 baseline set as each import
+    // line parses; a name reserved only by a NEWER spec version needs the
+    // file's final `version` (frontmatter ordering is not enforced), so
+    // those are checked here, once, at every exit from the parse loop.
+    auto check_versioned_aliases = [&]() {
+        const auto spec = spec_version_from_string(out.meta.version);
+        for (const auto& decl : out.imports) {
+            const auto since = builtin_since(decl.alias);
+            if (since && kSpecV01 < *since && *since <= spec) {
+                push_error(
+                    "import: alias `" + decl.alias + "` collides with a"
+                    " built-in element name (reserved since spec " +
+                    std::to_string(since->major) + "." +
+                    std::to_string(since->minor) + "). Use `as <other>`"
+                    " to disambiguate.",
+                    decl.source);
+            }
+        }
+    };
+
     while (!at_end(c)) {
         // Peek: if the next non-whitespace character is `<`, frontmatter
         // is over and the body starts here.
@@ -588,6 +612,7 @@ FrontmatterResult parse_frontmatter(std::string_view source,
         }
         if (!at_end(probe) && probe.src[probe.pos] == '<') {
             out.body_offset = probe.pos;
+            check_versioned_aliases();
             return out;
         }
 
@@ -684,6 +709,7 @@ FrontmatterResult parse_frontmatter(std::string_view source,
     }
 
     out.body_offset = c.pos;
+    check_versioned_aliases();
     return out;
 }
 

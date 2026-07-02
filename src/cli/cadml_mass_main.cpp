@@ -24,7 +24,7 @@ namespace {
 
 void print_usage(std::ostream& os) {
     os <<
-        "cadmlmass - CADML 0.1 mass + inertia properties\n"
+        "cadmlmass - CADML mass + inertia properties\n"
         "\n"
         "Usage:\n"
         "  cadmlmass <entry.cadml> [options]\n"

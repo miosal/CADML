@@ -211,13 +211,50 @@ TEST(Bundler, ExtrudeDefaultsAcceptedSemanticallyEquivalent) {
     EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
 }
 
+// ─── Spec-version gating (§15) ──────────────────────────────────────
+
+TEST(Bundler, Spec02VersionAccepted) {
+    auto r = cs("version 0.2\n<part name=\"p\"><circle r=\"5\"/></part>");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    // The flat output carries the declared version, normalised.
+    EXPECT_NE(r.flat_text.find("version 0.2.0"), std::string::npos);
+}
+
+TEST(Bundler, UnknownSpecVersionRejected) {
+    auto r = cs("version 0.3\n<part name=\"p\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("unrecognized spec version"),
+              std::string::npos);
+}
+
+TEST(Bundler, StlNotReservedInSpec01) {
+    // §15.2 pinning: `stl` joined the reserved set in 0.2. A 0.1 file's
+    // namespace is unaffected — it may keep using the name for its own
+    // defs and references.
+    auto r = cs(
+        "version 0.1\n"
+        "<def name=\"stl\"><extrude height=\"1\"><circle r=\"1\"/></extrude></def>\n"
+        "<part name=\"p\"><stl/></part>");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+}
+
+TEST(Bundler, DefNamedStlRejectedInSpec02) {
+    auto r = cs(
+        "version 0.2\n"
+        "<def name=\"stl\"><circle r=\"1\"/></def>\n"
+        "<part name=\"p\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("collides with a built-in"),
+              std::string::npos);
+}
+
 // ─── <stl> source validation ────────────────────────────────────────
 
 TEST(Bundler, StlBothSourcesRejected) {
     // Spec: the mesh comes from exactly one source. Both set previously
     // compiled clean and eval silently ignored `src`.
     auto r = cs(
-        "version 0.1\n"
+        "version 0.2\n"
         "<part><stl src=\"cube.stl\" data=\"AAAA\"/></part>");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.errors[0].message.find("both `src` and `data`"),
@@ -228,7 +265,7 @@ TEST(Bundler, StlBothSourcesRejected) {
 TEST(Bundler, StlNoSourceRejected) {
     // Bare <stl/> previously compiled clean and only warned at eval with
     // an empty mesh.
-    auto r = cs("version 0.1\n<part><stl/></part>");
+    auto r = cs("version 0.2\n<part><stl/></part>");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.errors[0].message.find("no mesh source"), std::string::npos);
     EXPECT_EQ(r.errors[0].category, CompileError::Schema);
@@ -239,7 +276,7 @@ TEST(Bundler, StlSrcInSingleFileModeRejected) {
     // resolve external references: an unresolvable import is a compile
     // error, and <stl src> must behave the same rather than compiling
     // clean and rendering an empty mesh at eval.
-    auto r = cs("version 0.1\n<part><stl src=\"cube.stl\"/></part>");
+    auto r = cs("version 0.2\n<part><stl src=\"cube.stl\"/></part>");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.errors[0].message.find("no base directory"),
               std::string::npos);

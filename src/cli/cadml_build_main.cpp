@@ -21,7 +21,7 @@ namespace {
 
 void print_usage(std::ostream& os) {
     os <<
-        "cadmlbuild - CADML 0.1 build wrapper (compile + check)\n"
+        "cadmlbuild - CADML build wrapper (compile + check)\n"
         "\n"
         "Usage:\n"
         "  cadmlbuild <entry.cadml> [-o <out.fcadml>] [options]\n"

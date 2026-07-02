@@ -33,7 +33,7 @@ recipes on top.
 Structural (9):       part def assembly connect port group script for svg
 2D primitives (4):    circle rect path sketch
 2D → 3D (5):          extrude revolve sweep loft helix
-Mesh import (1):      stl
+Mesh import (1):      stl                        (since spec 0.2)
 Booleans + hull (4):  union difference intersect hull
 Modifiers (5):        fillet chamfer shell cut pattern
 Flat-output (3):      param sources source     (compiler-emitted)

@@ -1,9 +1,9 @@
-# CADML 0.1 Specification
+# CADML 0.2 Specification
 
 **CAD Markup Language** — A declarative XML-based language for parametric solid modelling.
 
 This document is the **normative source of truth** for valid and invalid
-CADML 0.1 syntax, the compilation pipeline that lowers authoring files to the
+CADML 0.2 syntax, the compilation pipeline that lowers authoring files to the
 flat language the renderer consumes, and the contracts each layer must uphold.
 
 For information not in this document — exact tokenization rules, per-element
@@ -142,7 +142,7 @@ inputs to support incremental editing in tools.
 
 The first `<` character in the file (after stripping leading whitespace)
 ends the frontmatter and begins the body. XML processing instructions
-(`<?xml ... ?>`) are not permitted in CADML 0.1; they error.
+(`<?xml ... ?>`) are not permitted in CADML; they error.
 
 XML comments (`<!-- ... -->`) are permitted inside the body. They are
 parsed and discarded; the AST does not retain them and they do not appear
@@ -363,7 +363,7 @@ helpful diagnostic listing nearby valid names.
 
 ### 4.3 Reserved built-in element names
 
-For CADML 0.1, the following 31 names are reserved and cannot be used as
+For CADML 0.2, the following 31 names are reserved and cannot be used as
 import aliases or `<def>` names:
 
 **Structural (9):**
@@ -376,7 +376,8 @@ import aliases or `<def>` names:
 `extrude`, `revolve`, `sweep`, `loft`, `helix`
 
 **Mesh import (1):**
-`stl`
+`stl` *(reserved since 0.2 — files declaring `version 0.1` may still use
+the name; see §15.2)*
 
 **Booleans + hull (4):**
 `union`, `difference`, `intersect`, `hull`
@@ -393,9 +394,11 @@ revisions of this spec carried a "reserved-but-deferred" note for
 `<sweep>`, `<helix>`, and `<loft>`; all three have since landed.
 
 The reserved set is pinned to the spec version declared in the file's
-frontmatter. A future spec (e.g. 0.2) adding new built-ins does not
-retroactively break files declaring `version 0.1` — those files keep
-the 0.1 reserved set.
+frontmatter. A spec version adding new built-ins does not retroactively
+break files declaring an older version — this happened in 0.2, when
+`stl` joined the reserved set: files declaring `version 0.1` keep the
+30-name 0.1 reserved set (so `stl` remains usable as a def or alias
+name there), while `version 0.2` files see all 31 names reserved.
 
 ### 4.4 Collision rule
 
@@ -820,7 +823,9 @@ emits a warning.
 
 `<stl>` imports a triangle mesh from an STL blob and welds it into a solid
 that composes with the booleans (§5.5) and hull like any other 3D leaf — no
-special-casing. It is the mesh-native counterpart to importing a B-rep
+special-casing. Available since spec version **0.2**: a document using
+`<stl>` must declare `version 0.2` (in `version 0.1` files the name is
+not reserved — §15.2). It is the mesh-native counterpart to importing a B-rep
 model: take an existing part and edit it with CSG.
 
 The mesh comes from exactly one source:
@@ -833,7 +838,7 @@ The mesh comes from exactly one source:
   project root, are rejected.
 - **`data`** — the STL bytes embedded directly, encoded per `encoding`.
   This is the self-contained / single-file form (and what `src` compiles
-  to). `base64` is the only encoding in 0.1.
+  to). `base64` is the only encoding in 0.2.
 
 Both binary and ASCII STL are accepted; per-facet normals are ignored and
 recomputed from geometry. On import the mesh is passed through the CSG
@@ -860,10 +865,10 @@ attribute.
 |---|---|---|---|
 | `src` | path | — | `.stl` file, resolved relative to the document (authoring form) |
 | `data` | string | — | STL bytes embedded per `encoding` (self-contained form) |
-| `encoding` | enum | `base64` | Encoding of `data`; `base64` only in 0.1 |
+| `encoding` | enum | `base64` | Encoding of `data`; `base64` only in 0.2 |
 
 Intrinsic edits of the imported mesh itself (reshaping an existing feature)
-are out of scope for 0.1 — `<stl>` is a geometry source for compositing,
+are out of scope for 0.2 — `<stl>` is a geometry source for compositing,
 not a mesh editor.
 
 ### 5.5 Booleans
@@ -1970,7 +1975,7 @@ escalate warnings to errors with `--strict`.
 
 ### 15.1 Spec versions
 
-CADML evolves incrementally. Each spec version (this document is `0.1`) is
+CADML evolves incrementally. Each spec version (this document is `0.2`) is
 identified by the string in `version` declarations.
 
 - **Patch (e.g., `0.1.1`)**: bug fixes only. No new elements, no schema
@@ -1993,10 +1998,16 @@ recognizes is an error.
 
 ### 15.3 Compatibility table
 
-A 0.1.x compiler accepts files that declare `version 0.1`. Any other
-literal version string (`0.2`, `1.0`, anything else) is rejected with
-an unrecognized-spec-version error. The compiler does not heuristically
-"degrade" newer files to 0.1 semantics.
+A compiler implementing spec 0.2 accepts files that declare `version
+0.1` or `version 0.2` (including patch forms such as `0.1.0` or
+`0.2.0`); each file is validated against the reserved set of the
+version *it* declares (§15.2). Any other literal version string
+(`0.3`, `1.0`, anything else) is rejected with an
+unrecognized-spec-version error. A document may import files declaring
+an equal-or-older spec version, never a newer one — the compiled flat
+document carries the entry file's version, so newer-spec vocabulary
+cannot be smuggled beneath an older declaration. The compiler does not
+heuristically "degrade" newer files to older semantics.
 
 ---
 
@@ -2058,4 +2069,4 @@ emits but the user never authors directly).
 
 ---
 
-*End of CADML 0.1 specification.*
+*End of CADML 0.2 specification.*

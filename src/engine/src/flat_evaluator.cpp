@@ -1617,9 +1617,20 @@ FlatMesh eval_instance(const Document& doc, const Node& inst_node,
 
     const auto def_resolved = resolve_def_for_instance(doc, inst_node);
     if (def_resolved < 0) {
-        warnings.push_back({
-            "instance `" + ia.ref_name + "` references unknown def",
-            inst_node.source });
+        std::string msg =
+            "instance `" + ia.ref_name + "` references unknown def";
+        // The likely authoring mistake behind an unknown ref that matches
+        // a NEWER spec's built-in (e.g. <stl> in a `version 0.1` file,
+        // where §15.2 pinning keeps the name unreserved) is an outdated
+        // version declaration — say so.
+        if (const auto since = builtin_since(ia.ref_name);
+            since && spec_version_from_string(doc.meta.version) < *since) {
+            msg += " — `" + ia.ref_name + "` is a built-in element since"
+                   " spec version " + std::to_string(since->major) + "." +
+                   std::to_string(since->minor) + "; this document"
+                   " declares `version " + doc.meta.version + "`";
+        }
+        warnings.push_back({ std::move(msg), inst_node.source });
         return {};
     }
     const auto def_idx = static_cast<std::uint32_t>(def_resolved);

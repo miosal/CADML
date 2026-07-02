@@ -20,7 +20,7 @@ namespace {
 
 void print_usage(std::ostream& os) {
     os <<
-        "cadmlstl - CADML 0.1 binary STL exporter\n"
+        "cadmlstl - CADML binary STL exporter\n"
         "\n"
         "Usage:\n"
         "  cadmlstl <entry.cadml> -o <out.stl> [options]\n"
