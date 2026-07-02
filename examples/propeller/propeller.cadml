@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "5-inch drone propeller (3-blade, 5045 pitch). The blade is a 12-station polyhedral loft of Clark-Y airfoils whose chord and twist are computed by propeller.lua from the propeller's tip radius and pitch. The hub is a simple cylindrical extrude. Three blades are placed 120 degrees apart via <pattern>."
 

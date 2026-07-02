@@ -11,7 +11,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(cadml
     # Software/implementation version (semver). Independent of the CADML
-    # *language* spec version, which is 0.1 (see docs/spec/language.md).
+    # *language* spec version (see docs/spec/language.md).
     VERSION      0.2.0
     DESCRIPTION  "CADML - declarative parametric CAD markup language"
     HOMEPAGE_URL "https://github.com/miosal/cadml"

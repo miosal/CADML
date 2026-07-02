@@ -127,7 +127,7 @@ Explicit `segments="N"` is honoured verbatim and bypasses **both**
 clamp bounds; `segments="3"` produces a triangle, `segments="4"` a
 diamond, and a value above 256 is also honoured as-is.
 
-> **Implementation note.** The above describes the v0.1 engine
+> **Implementation note.** The above describes the reference engine
 > (`flat_geometry.cpp::tessellate_circle`), which is what every CLI tool
 > runs.
 
@@ -449,7 +449,7 @@ The input must be a single closed surface (`<extrude>` of a convex
 `open="end"` removes the end-cap. Both faces remain by default.
 
 The full selector grammar from spec §13 is deferred — only `start` and
-`end` are accepted in 0.1.
+`end` are accepted in 0.2.
 
 ### 8.4 `<cut>`
 

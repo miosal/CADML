@@ -282,7 +282,7 @@ the flat document — they have been replaced by their expanded children.
 ### 2.5 `<cut>` is NOT lowered
 
 Earlier revisions of this document said the bundler lowered `<cut>` to
-`<difference>` plus a wedge cutter. That is not what the 0.1 toolchain
+`<difference>` plus a wedge cutter. That is not what the toolchain
 does: `<cut>` survives compilation as a `<cut>` node in the `.fcadml`,
 and the evaluator (`flat_evaluator.cpp`, `NodeType::Cut`) handles it
 during mesh build instead.

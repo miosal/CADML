@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Showcase for the <path> tessellator (M/L/Z): four parts laid out along x demonstrate non-rectangular profiles authored as closed polylines — a hex bolt head, a trapezoidal fork plate, an arrow, and a five-pointed star."
 

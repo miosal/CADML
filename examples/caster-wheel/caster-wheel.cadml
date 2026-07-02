@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Caster-wheel assembly — three separate parts (fork, axle, wheel) imported from their own files and placed at the right transforms here. Each top-level `<part>` wraps one imported def in a `<group transform>` so the final output carries three independently-coloured parts: a slicer or 3MF viewer sees fork / axle / wheel as distinct entities, not a fused blob."
 

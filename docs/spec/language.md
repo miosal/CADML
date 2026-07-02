@@ -117,7 +117,7 @@ is **not** an implicit name.
 
 The common case is a single export per file — it keeps imports
 unambiguous (`import "bolt.cadml"` then `<bolt/>`). Multiple top-level
-exports are supported for two situations the 0.1 toolchain handles
+exports are supported for two situations the toolchain handles
 directly:
 
 - A file that bundles a related family of parts (e.g.
@@ -238,14 +238,14 @@ section, ordering rules:
 
 | Keyword | Value | Default | Description |
 |---|---|---|---|
-| `version` | spec version (e.g. `0.1` or `0.1.0`) | required | Major.minor or major.minor.patch; both forms accepted |
+| `version` | spec version (e.g. `0.2` or `0.2.0`) | required | Major.minor or major.minor.patch; both forms accepted |
 | `units` | `mm` / `cm` / `m` / `in` / `ft` | `mm` | Document numeric unit |
 | `description` | quoted string | empty | Human-readable description |
 | `tags` | quoted string (space-separated) | empty | Searchable tags |
 | `catalogue-version` | semver string (`major.minor.patch`) | empty | For catalogue parts only |
 | `interference-tolerance` | volume quantity | `0mm³` | Threshold below which `cadml_check` ignores overlaps |
 
-The `version` value accepts both short (`0.1`) and full (`0.1.0`) forms;
+The `version` value accepts both short (`0.2`) and full (`0.2.0`) forms;
 they are equivalent. Internally the compiler normalises to the
 three-component form.
 
@@ -637,7 +637,7 @@ section**:
 ```
 
 (Treating `<script>` content as raw text per HTML's convention is on the
-0.2+ roadmap. Until then, the standard XML escaping rule applies.)
+0.3+ roadmap. Until then, the standard XML escaping rule applies.)
 
 Attributes: `lang="lua"` (only `lua` supported in 0.2).
 
@@ -735,7 +735,7 @@ Linearly extrude the contained 2D profile into 3D.
 Children: a 2D primitive (`<rect>`, `<circle>`, `<path>`) or a `<sketch>`.
 
 **Reserved attributes — rejected in 0.2.** The following attribute
-names are reserved for a future release; the v0.1 bundler and
+names are reserved for a future release; the bundler and
 evaluator both reject them with a clear error so authoring tools
 cannot quietly produce wrong geometry.
 
@@ -1123,7 +1123,7 @@ height="{a + b}"    expression
 | `*` `/` `%` | Multiplicative | |
 | `+` `-` | Additive | |
 
-The 0.1 expression grammar supports arithmetic (`+ - * / %`),
+The 0.2 expression grammar supports arithmetic (`+ - * / %`),
 parentheses, parameter references, and dotted-path Lua / native
 function calls. Comparison, logical, ternary, and exponentiation are
 not part of 0.2 — use a Lua helper for conditional logic. Example:
@@ -1297,7 +1297,7 @@ sealed in its own scope (Section 8.3).
 
 Imported `.lua` files cannot access each other's exports in 0.2 (each is
 sealed in its own scope). Cross-module calls must go through the
-consuming `.cadml` file's expression scope. (Deferred to 0.2+.)
+consuming `.cadml` file's expression scope. (Deferred to 0.3+.)
 
 ---
 
@@ -1350,7 +1350,7 @@ runtime dependency without sacrificing parametric re-rendering.
 
 **Param-reference expressions** stay symbolic in the flat output. These
 are expressions that reference *only* frontmatter params, literals, and
-the 0.1 arithmetic operators (`+`, `-`, `*`, `/`, `%`, parens — see
+the 0.2 arithmetic operators (`+`, `-`, `*`, `/`, `%`, parens — see
 §7.2). The engine resolves them at evaluate time against the
 in-document `<param>` table:
 
@@ -1674,7 +1674,7 @@ the user to recompile.
 
 The exact-dimension guarantees in this section (`radius` matches in
 §12.2, `distance` matches in §12.3, uniform `thickness` in §12.4)
-describe the **v0.1 reference engine** — the flat evaluator under
+describe the **reference engine** — the flat evaluator under
 `cadml::engine::evaluate_flat`, implemented in
 `src/engine/src/flat_geometry.cpp`. This is the engine the
 `cadmlstl`/`cadmlcheck`/`cadmlbuild` CLIs run, and the contract for
@@ -1980,7 +1980,7 @@ identified by the string in `version` declarations.
 
 - **Patch (e.g., `0.1.1`)**: bug fixes only. No new elements, no schema
   changes. All `0.1.0` files parse identically under `0.1.1`.
-- **Minor (e.g., `0.1`)**: additive — new elements, new attributes, new
+- **Minor (e.g., `0.2`)**: additive — new elements, new attributes, new
   modifiers, new selectors. Existing files continue parsing under their
   declared version.
 - **Major (e.g., `1.0`)**: breaking changes. Old files require migration.

@@ -99,7 +99,7 @@ with the same shape, except:
 **Exporter → bytes.** Format-specific. STL uses per-face normals
 recomputed from geometry. glTF/glB carries per-vertex positions and
 indices; per-vertex normals are emitted only when the engine produced
-non-zero ones (the 0.1 primitive constructors leave them zero, so
+non-zero ones (the primitive constructors leave them zero, so
 viewers fall back to flat shading — see `docs/exporters.md` §4.3).
 Each part's glTF node carries `extras.source` / `extras.line` pointing
 at the originating `<part>` for editor integration.
@@ -214,7 +214,7 @@ each compiler pass.
 ```
 Document
 ├── frontmatter
-│   ├── version: "0.1"
+│   ├── version: "0.2"
 │   ├── units:   "mm"
 │   ├── description: optional<string>
 │   ├── tags:    optional<string>

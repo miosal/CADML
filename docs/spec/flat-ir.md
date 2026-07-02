@@ -93,7 +93,7 @@ param shank-l = 50            ← surviving frontmatter params (immutable)
 - `hash` is the lower-case hex of the file's SHA-256 byte content
   at the time of bundling. Tools comparing this hash against the
   current file on disk can detect staleness. (The attribute is named
-  `hash` for brevity; SHA-256 is the only algorithm the 0.1 bundler
+  `hash` for brevity; SHA-256 is the only algorithm the bundler
   emits.)
 
 The entry file is always `id="0"`. Other IDs are assigned in

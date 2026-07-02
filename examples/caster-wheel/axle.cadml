@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Axle pin for the caster — a plain cylinder with three named ports for assembly mating. `end-a` and `end-b` are the two ends that seat in the fork's leg holes; `mid` is the midpoint where the wheel hub mounts. Local frame: axle axis along +z, body spans z = 0 to z = length."
 

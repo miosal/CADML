@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Right-angle structural bracket with mounting holes — the kind of stamped or extruded steel angle you'd buy by the meter from a hardware catalog. Two legs at 90 degrees, each with three M5 clearance holes on a regular spacing. The L-profile is traced as a path; mounting holes are extrude+circle cuts subtracted via difference. Demonstrates the workhorse pattern: 2D path for the silhouette, plus per-feature cylindrical cuts for fastener clearance."
 
