@@ -549,6 +549,34 @@ TEST(Frontmatter, ImportNonCollidingAliasOK) {
     EXPECT_EQ(r.imports[0].alias, "my-circle");
 }
 
+TEST(Frontmatter, AliasStlAllowedInSpec01) {
+    // §15.2 pinning: `stl` joined the reserved set in spec 0.2, so a
+    // 0.1 file may still use it as an import alias.
+    auto r = parse_fm(
+        "version 0.1\n"
+        "import \"thing.cadml\" as stl\n");
+    EXPECT_TRUE(r.ok());
+    EXPECT_EQ(r.imports[0].alias, "stl");
+}
+
+TEST(Frontmatter, AliasStlRejectedInSpec02) {
+    auto r = parse_fm(
+        "version 0.2\n"
+        "import \"thing.cadml\" as stl\n");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("reserved since spec 0.2"),
+              std::string::npos);
+}
+
+TEST(Frontmatter, AliasStlRejectedWhenVersionDeclaredAfterImport) {
+    // Frontmatter ordering is a style rule, not enforced — the alias
+    // check must still see a `version` that arrives after the import.
+    auto r = parse_fm(
+        "import \"thing.cadml\" as stl\n"
+        "version 0.2\n");
+    EXPECT_FALSE(r.ok());
+}
+
 TEST(Frontmatter, ErrorPointsAtCorrectLine) {
     auto r = parse_fm(
         "version 0.1\n"

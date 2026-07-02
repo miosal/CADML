@@ -29,7 +29,7 @@ statement matches one of:
 
 | Statement | Form | Example |
 |---|---|---|
-| Setting | `<key> <value>` | `version 0.1` |
+| Setting | `<key> <value>` | `version 0.2` |
 | Description | `description "<string>"` | `description "M8 hex bolt"` |
 | Tags | `tags "<string>"` | `tags "fastener,bolt"` |
 | Import | `import "<path>" [as <alias>]` | `import "x.lua" as x` |
@@ -48,7 +48,7 @@ statement matches one of:
 **Comment rules:**
 
 - `# ...` to end of line is a comment. Comments may stand alone or
-  follow a statement: `version 0.1 # bumped from 0.1`.
+  follow a statement: `version 0.2 # bumped from 0.1`.
 - Comments do **not** continue across lines. There is no `/* ... */`
   block-comment form in frontmatter.
 - A line starting with `#` is a pure comment line.
@@ -73,7 +73,8 @@ the body string before pugixml sees it, so multiple top-level siblings
 parse as a tree. The synthetic root is then unwrapped — `Document::nodes`
 holds the children of the synthetic root, not the root itself.
 
-**Allowed elements** are the 31 reserved built-ins (see spec §4.3) plus
+**Allowed elements** are the reserved built-ins of the file's declared
+spec version (31 as of 0.2 — see spec §4.3 and §15.2) plus
 any import alias or local `<def>` name. Unknown element names produce
 a `Vocabulary` parse error, *except* during initial parsing where the
 single-file vocabulary check is deferred — the full check runs in the
@@ -216,7 +217,7 @@ right file).
 For each file in the import set, build a map of `element_name → kind`
 where `kind` is one of:
 
-- `BuiltIn` — one of the 31 reserved names.
+- `BuiltIn` — one of the reserved names of the file's declared spec version.
 - `Def` — a local `<def name="...">` declared in this file.
 - `ImportAlias` — an `import "..." as <name>` declaration.
 
@@ -281,7 +282,7 @@ the flat document — they have been replaced by their expanded children.
 ### 2.5 `<cut>` is NOT lowered
 
 Earlier revisions of this document said the bundler lowered `<cut>` to
-`<difference>` plus a wedge cutter. That is not what the 0.1 toolchain
+`<difference>` plus a wedge cutter. That is not what the toolchain
 does: `<cut>` survives compilation as a `<cut>` node in the `.fcadml`,
 and the evaluator (`flat_evaluator.cpp`, `NodeType::Cut`) handles it
 during mesh build instead.
@@ -538,7 +539,7 @@ If you're writing a bundler from scratch:
   assemblies — assemblies use it for port positions.
 - **Then assemblies.** Single-level first (one `<assembly>` with bare
   instances), then mating with `at`/`port`, then nested.
-- `<cut>` is not lowered in 0.1 — the evaluator handles it. If you
+- `<cut>` is not lowered in 0.2 — the evaluator handles it. If you
   ever do add a compiler-side lowering pass, save it for last; the
   edge-selection algorithm is the hairiest in the codebase.
 

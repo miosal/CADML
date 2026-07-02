@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Two parts (plate, bolt) mated via `<port>` ports inside an `<assembly>`. The bolt's `head-seat` port mates the plate's `hole` port — anti-parallel normals make the mate a pure face-to-face translation: the bolt's head lands flush on the plate's top face and the shaft hangs through the hole. The single output `<part name=\"bolt-on-plate\">` is what `<assembly>` produces; tools that need a separately-coloured multi-part deliverable should use the top-level-`<part>`-wrappers pattern (see `examples/caster-wheel/`) instead."
 

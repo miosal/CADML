@@ -392,17 +392,11 @@ ImportParse parse_import_line(std::string_view line) {
     decl.is_lua = p.size() >= 4 &&
                   p.compare(p.size() - 4, 4, ".lua") == 0;
 
-    // Spec §4.4: import alias cannot collide with a built-in element name.
-    // (Both the explicitly-given `as <alias>` and the filename-derived
-    // default are subject to this rule.)
-    if (node_type_from_builtin_name(decl.alias) != NodeType::Unknown) {
-        out.error = std::string(
-            "import: alias `" + decl.alias +
-            "` collides with a built-in element name. Use `as <other>` to"
-            " disambiguate.");
-        return out;
-    }
-
+    // Spec §4.4 (alias vs built-in collision) is NOT checked here: the
+    // reserved set depends on the file's declared spec version (§15.2),
+    // and the `version` line may not have been read yet — frontmatter
+    // ordering is a style rule, not enforced. parse_frontmatter runs the
+    // single check over all recorded imports at every parse-loop exit.
     out.decl = std::move(decl);
     return out;
 }
@@ -576,6 +570,30 @@ FrontmatterResult parse_frontmatter(std::string_view source,
         out.warnings.push_back(std::move(w));
     };
 
+    // Spec §4.4: an import alias cannot collide with a built-in element
+    // name, judged against the file's declared spec version (§15.2
+    // pinning). This is the single check site for the rule, run at every
+    // exit from the parse loop rather than per import line, because
+    // frontmatter ordering is a style rule, not enforced — the `version`
+    // line may arrive after an import.
+    auto check_aliases = [&]() {
+        const auto spec = spec_version_from_string(out.meta.version);
+        for (const auto& decl : out.imports) {
+            if (node_type_from_builtin_name(decl.alias, spec)
+                    == NodeType::Unknown) {
+                continue;
+            }
+            std::string msg = "import: alias `" + decl.alias +
+                "` collides with a built-in element name";
+            if (const auto since = builtin_since(decl.alias);
+                since && kSpecV01 < *since) {
+                msg += " (reserved since spec " + to_string(*since) + ")";
+            }
+            msg += ". Use `as <other>` to disambiguate.";
+            push_error(std::move(msg), decl.source);
+        }
+    };
+
     while (!at_end(c)) {
         // Peek: if the next non-whitespace character is `<`, frontmatter
         // is over and the body starts here.
@@ -588,6 +606,7 @@ FrontmatterResult parse_frontmatter(std::string_view source,
         }
         if (!at_end(probe) && probe.src[probe.pos] == '<') {
             out.body_offset = probe.pos;
+            check_aliases();
             return out;
         }
 
@@ -684,6 +703,7 @@ FrontmatterResult parse_frontmatter(std::string_view source,
     }
 
     out.body_offset = c.pos;
+    check_aliases();
     return out;
 }
 

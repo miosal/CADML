@@ -18,7 +18,7 @@ cadmlstl hex-bolt/hex-bolt.cadml -o hex-bolt.stl       # full pipeline → STL
 | [`flange/`](flange/) | Stacked-extrude flange disc with a `<pattern type="circular">` bolt-hole pattern. |
 | [`de-laval-nozzle/`](de-laval-nozzle/) | Pure revolve of a complex `<path>` profile. |
 | [`v-belt-pulley/`](v-belt-pulley/) | Revolve + grooved profile (V-belt cross-section). |
-| [`hex-bolt/`](hex-bolt/) | Union of extrudes + helical thread via `<sweep>` over `<helix>`. Exercises most of the 0.1 language surface in one file. |
+| [`hex-bolt/`](hex-bolt/) | Union of extrudes + helical thread via `<sweep>` over `<helix>`. Exercises most of the language surface in one file. |
 | [`hex-nut/`](hex-nut/) | Pair to hex-bolt: helical internal thread with the cutter apex pointing outward. |
 | [`compression-spring/`](compression-spring/) | `<sweep>` of a `<circle>` along a `<helix>` — the simplest non-trivial swept geometry. |
 | [`compressor/`](compressor/) | Lua-driven centrifugal compressor wheel: bell-shaped revolve + backswept blades via `<for>` + `<extrude>` of generated `<path>` data. |

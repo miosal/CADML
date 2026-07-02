@@ -135,7 +135,7 @@ Binary operators (in precedence order, lowest to highest):
 Unary `-` (negation) binds tighter than `*`/`/`: `-x*y` parses as
 `(-x)*y`. Use parens if ambiguous.
 
-Exponentiation (`^`) is not part of the 0.1 grammar; the parser
+Exponentiation (`^`) is not part of the 0.2 grammar; the parser
 rejects `^`. Use `pow(x, y)` instead (see §7).
 
 Integer division is **not** distinguished — `5/2` produces `2.5`. To
@@ -191,7 +191,7 @@ arg-list := ( expression ( "," expression )* )?
 
 `math.*` (Lua's standard math library) is always available; module
 identifiers come from `import "..." as alias` declarations. All
-arguments are positional in 0.1 — the call site has no `name=value`
+arguments are positional in 0.2 — the call site has no `name=value`
 keyword-argument syntax. Pass a table from Lua-side helpers if you
 need named parameters.
 
@@ -213,7 +213,7 @@ They are matched by exact name **and** argument count.
 | `abs(x)` | 1 | number | absolute value |
 | `min(a, b)` | 2 | number | smaller of two values (binary only) |
 | `max(a, b)` | 2 | number | larger of two values (binary only) |
-| `pow(base, exp)` | 2 | number | exponentiation — the canonical form (the `^` operator is not part of the 0.1 grammar; see §5) |
+| `pow(base, exp)` | 2 | number | exponentiation — the canonical form (the `^` operator is not part of the 0.2 grammar; see §5) |
 | `floor(x)` | 1 | number | round toward −∞ |
 | `ceil(x)` | 1 | number | round toward +∞ |
 | `round(x)` | 1 | number | round to nearest integer |

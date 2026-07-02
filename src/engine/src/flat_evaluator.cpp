@@ -764,7 +764,7 @@ FlatMesh eval_3d(const Document& doc, const Node& n,
                 !direction_is_plus_z(a.direction_expr)) {
                 warnings.push_back({
                     "<extrude scale=|draft=|direction=> is not supported "
-                    "in 0.1 — remove the attribute or use <loft> for a "
+                    "— remove the attribute or use <loft> for a "
                     "tapered profile.",
                     n.source });
                 return {};
@@ -1617,9 +1617,19 @@ FlatMesh eval_instance(const Document& doc, const Node& inst_node,
 
     const auto def_resolved = resolve_def_for_instance(doc, inst_node);
     if (def_resolved < 0) {
-        warnings.push_back({
-            "instance `" + ia.ref_name + "` references unknown def",
-            inst_node.source });
+        std::string msg =
+            "instance `" + ia.ref_name + "` references unknown def";
+        // The likely authoring mistake behind an unknown ref that matches
+        // a NEWER spec's built-in (e.g. <stl> in a `version 0.1` file,
+        // where §15.2 pinning keeps the name unreserved) is an outdated
+        // version declaration — say so.
+        if (const auto since = builtin_since(ia.ref_name);
+            since && spec_version_from_string(doc.meta.version) < *since) {
+            msg += " — `" + ia.ref_name + "` is a built-in element since"
+                   " spec version " + to_string(*since) + "; this document"
+                   " declares `version " + doc.meta.version + "`";
+        }
+        warnings.push_back({ std::move(msg), inst_node.source });
         return {};
     }
     const auto def_idx = static_cast<std::uint32_t>(def_resolved);

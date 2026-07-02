@@ -211,13 +211,88 @@ TEST(Bundler, ExtrudeDefaultsAcceptedSemanticallyEquivalent) {
     EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
 }
 
+// ─── Spec-version gating (§15) ──────────────────────────────────────
+
+TEST(Bundler, Spec02VersionAccepted) {
+    auto r = cs("version 0.2\n<part name=\"p\"><circle r=\"5\"/></part>");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    // The flat output carries the declared version, normalised.
+    EXPECT_NE(r.flat_text.find("version 0.2.0"), std::string::npos);
+}
+
+TEST(Bundler, UnknownSpecVersionRejected) {
+    auto r = cs("version 0.3\n<part name=\"p\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("unrecognized spec version"),
+              std::string::npos);
+}
+
+TEST(Bundler, StlNotReservedInSpec01) {
+    // §15.2 pinning: `stl` joined the reserved set in 0.2. A 0.1 file's
+    // namespace is unaffected — it may keep using the name for its own
+    // defs and references.
+    auto r = cs(
+        "version 0.1\n"
+        "<def name=\"stl\"><extrude height=\"1\"><circle r=\"1\"/></extrude></def>\n"
+        "<part name=\"p\"><stl/></part>");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+}
+
+TEST(Bundler, DefNamedStlRejectedInSpec02) {
+    auto r = cs(
+        "version 0.2\n"
+        "<def name=\"stl\"><circle r=\"1\"/></def>\n"
+        "<part name=\"p\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("collides with a built-in"),
+              std::string::npos);
+}
+
+TEST(Bundler, MalformedSpecVersionSuffixRejected) {
+    // §15.3 promises rejection for anything that is not a supported
+    // major.minor[.patch]; a 4-char prefix check used to let malformed
+    // suffixes through and stamp them verbatim into the flat output.
+    for (const char* v : { "0.2.", "0.2.banana", "0.2.0.0" }) {
+        auto r = cs(std::string("version ") + v + "\n<part name=\"p\"/>");
+        ASSERT_FALSE(r.ok()) << "accepted malformed version: " << v;
+        EXPECT_NE(r.errors[0].message.find("unrecognized spec version"),
+                  std::string::npos) << v;
+    }
+}
+
+TEST(Bundler, HostileVersionDigitRunRejectedCleanly) {
+    // Regression: a huge numeric component used to hit signed-integer
+    // overflow (UB) in spec_version_from_string before the acceptance
+    // check could reject it.
+    auto r = cs("version 99999999999999999999.1\n<part name=\"p\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("unrecognized spec version"),
+              std::string::npos);
+}
+
+TEST(Bundler, StlInStaleSpec01DocumentIsCompileError) {
+    // §15.2 pinning classifies <stl> in a `version 0.1` document as an
+    // ordinary instance reference. If nothing defines the name, that is
+    // a stale `version` declaration: fail the compile with a pointed
+    // error rather than exiting 0 and rendering an empty mesh at eval
+    // (files that were valid under software v0.1.1 hit exactly this).
+    auto r = cs(
+        "version 0.1\n"
+        "<part name=\"p\"><stl data=\"AAAA\"/></part>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("since spec version 0.2"),
+              std::string::npos);
+    EXPECT_NE(r.errors[0].message.find("bump the `version`"),
+              std::string::npos);
+}
+
 // ─── <stl> source validation ────────────────────────────────────────
 
 TEST(Bundler, StlBothSourcesRejected) {
     // Spec: the mesh comes from exactly one source. Both set previously
     // compiled clean and eval silently ignored `src`.
     auto r = cs(
-        "version 0.1\n"
+        "version 0.2\n"
         "<part><stl src=\"cube.stl\" data=\"AAAA\"/></part>");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.errors[0].message.find("both `src` and `data`"),
@@ -228,7 +303,7 @@ TEST(Bundler, StlBothSourcesRejected) {
 TEST(Bundler, StlNoSourceRejected) {
     // Bare <stl/> previously compiled clean and only warned at eval with
     // an empty mesh.
-    auto r = cs("version 0.1\n<part><stl/></part>");
+    auto r = cs("version 0.2\n<part><stl/></part>");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.errors[0].message.find("no mesh source"), std::string::npos);
     EXPECT_EQ(r.errors[0].category, CompileError::Schema);
@@ -239,7 +314,7 @@ TEST(Bundler, StlSrcInSingleFileModeRejected) {
     // resolve external references: an unresolvable import is a compile
     // error, and <stl src> must behave the same rather than compiling
     // clean and rendering an empty mesh at eval.
-    auto r = cs("version 0.1\n<part><stl src=\"cube.stl\"/></part>");
+    auto r = cs("version 0.2\n<part><stl src=\"cube.stl\"/></part>");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.errors[0].message.find("no base directory"),
               std::string::npos);

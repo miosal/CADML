@@ -48,7 +48,7 @@ is identical to authoring CADML. The same parser produces a
 shape.
 
 ```
-version 0.1
+version 0.2
 units mm
 description "..."
 param shank-l = 50            ← surviving frontmatter params (immutable)
@@ -93,7 +93,7 @@ param shank-l = 50            ← surviving frontmatter params (immutable)
 - `hash` is the lower-case hex of the file's SHA-256 byte content
   at the time of bundling. Tools comparing this hash against the
   current file on disk can detect staleness. (The attribute is named
-  `hash` for brevity; SHA-256 is the only algorithm the 0.1 bundler
+  `hash` for brevity; SHA-256 is the only algorithm the bundler
   emits.)
 
 The entry file is always `id="0"`. Other IDs are assigned in
@@ -230,12 +230,9 @@ a checked-in `.fcadml` for regression detection.
 ## 8. Stability
 
 The `.fcadml` format is **versioned by the same `version`** as the
-authoring language. A flat file declares `version 0.1` and is
-interpreted by a 0.1 evaluator. Cross-version flat files are not
-supported in 0.1.
-
-When a future CADML (e.g. 0.2) lands, the flat format may gain new
-elements (for deferred features like the selector grammar in §13 of the
-language spec). A 0.1 evaluator reading a 0.2 flat file will reject it at
-the version check; a 0.2 evaluator reading a 0.1 flat file will
-work (backward-compatible).
+authoring language: a flat file carries the version its entry document
+declared, and is interpreted against that version's vocabulary. This
+happened with 0.2 (which added `<stl>`): a 0.2 toolchain reads both
+0.1 and 0.2 flat files — older versions are a strict vocabulary subset
+— while a flat file declaring a version newer than the toolchain
+implements is rejected at the version check, never half-interpreted.

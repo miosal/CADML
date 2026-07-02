@@ -29,6 +29,14 @@
 #include <io.h>
 #endif
 
+// Software version reported in the LSP initialize response. Injected by
+// the build from project(VERSION …) in the top-level CMakeLists.txt —
+// the single source of truth — with a fallback so non-CMake builds
+// (analysis tools, ad-hoc compiles) still link.
+#ifndef CADML_SOFTWARE_VERSION
+#define CADML_SOFTWARE_VERSION "unknown"
+#endif
+
 namespace {
 
 namespace rj = rapidjson;
@@ -59,7 +67,7 @@ constexpr SpecEntry kElements[] = {
     {"sweep", "3D sweep", "Sweeps a profile along a path.", "sweep>\n  $0\n</sweep>"},
     {"loft", "3D loft", "Lofts between ordered profiles.", "loft>\n  $0\n</loft>"},
     {"helix", "3D helix", "Creates a helical solid/path primitive.", "helix radius=\"$1\" pitch=\"$2\" turns=\"$3\"/>"},
-    {"stl", "STL mesh import", "Imports a triangle mesh from an STL file (src=) or embedded base64 (data=).", "stl src=\"$1\"/>"},
+    {"stl", "STL mesh import", "Imports a triangle mesh from an STL file (src=) or embedded base64 (data=). Requires version 0.2.", "stl src=\"$1\"/>"},
     {"union", "Boolean union", "Combines child solids.", "union>\n  $0\n</union>"},
     {"difference", "Boolean difference", "Subtracts later child solids from the first child solid.", "difference>\n  $0\n</difference>"},
     {"intersect", "Boolean intersection", "Keeps the shared volume of child solids.", "intersect>\n  $0\n</intersect>"},
@@ -72,7 +80,7 @@ constexpr SpecEntry kElements[] = {
 };
 
 constexpr SpecEntry kFrontmatter[] = {
-    {"version", "CADML setting", "Spec version. CADML 0.1 accepts 0.1 or 0.1.0.", "version 0.1"},
+    {"version", "CADML setting", "Spec version: 0.1 or 0.2 (patch forms like 0.2.0 accepted).", "version 0.2"},
     {"units", "CADML setting", "Document units: mm, cm, m, in, or ft.", "units mm"},
     {"description", "CADML setting", "Quoted human-readable document description.", "description \"$1\""},
     {"tags", "CADML setting", "Quoted space-separated searchable tags.", "tags \"$1\""},
@@ -89,7 +97,7 @@ constexpr SpecEntry kAttributes[] = {
     {"at", "CADML attribute", "Parent port used for mating an instance.", "at=\"$1\""},
     {"port", "CADML attribute", "Own port used for mating an instance.", "port=\"$1\""},
     {"transform", "CADML attribute", "SVG-like transform chain.", "transform=\"$1\""},
-    {"lang", "CADML attribute", "Script language. CADML 0.1 supports lua.", "lang=\"lua\""},
+    {"lang", "CADML attribute", "Script language. CADML supports lua.", "lang=\"lua\""},
     {"var", "CADML attribute", "Loop variable name for a for element.", "var=\"$1\""},
     {"from", "CADML attribute", "Start expression for a uniform for loop.", "from=\"$1\""},
     {"to", "CADML attribute", "End expression for a uniform for loop.", "to=\"$1\""},
@@ -350,7 +358,7 @@ private:
 
         rj::Value server_info(rj::kObjectType);
         server_info.AddMember("name", "cadmllsp", alloc);
-        server_info.AddMember("version", "0.1.0", alloc);
+        server_info.AddMember("version", CADML_SOFTWARE_VERSION, alloc);
         result.AddMember("serverInfo", server_info, alloc);
 
         rj::Value capabilities(rj::kObjectType);

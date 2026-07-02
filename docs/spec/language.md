@@ -1,9 +1,9 @@
-# CADML 0.1 Specification
+# CADML 0.2 Specification
 
 **CAD Markup Language** — A declarative XML-based language for parametric solid modelling.
 
 This document is the **normative source of truth** for valid and invalid
-CADML 0.1 syntax, the compilation pipeline that lowers authoring files to the
+CADML 0.2 syntax, the compilation pipeline that lowers authoring files to the
 flat language the renderer consumes, and the contracts each layer must uphold.
 
 For information not in this document — exact tokenization rules, per-element
@@ -88,7 +88,7 @@ A `.cadml` file consists of a frontmatter block followed by an XML body:
 
 ```
 [ Frontmatter — line-oriented ]
-version 0.1
+version 0.2
 units mm
 description "..."
 tags "..."
@@ -117,7 +117,7 @@ is **not** an implicit name.
 
 The common case is a single export per file — it keeps imports
 unambiguous (`import "bolt.cadml"` then `<bolt/>`). Multiple top-level
-exports are supported for two situations the 0.1 toolchain handles
+exports are supported for two situations the toolchain handles
 directly:
 
 - A file that bundles a related family of parts (e.g.
@@ -142,7 +142,7 @@ inputs to support incremental editing in tools.
 
 The first `<` character in the file (after stripping leading whitespace)
 ends the frontmatter and begins the body. XML processing instructions
-(`<?xml ... ?>`) are not permitted in CADML 0.1; they error.
+(`<?xml ... ?>`) are not permitted in CADML; they error.
 
 XML comments (`<!-- ... -->`) are permitted inside the body. They are
 parsed and discarded; the AST does not retain them and they do not appear
@@ -207,7 +207,7 @@ Three statement shapes share the frontmatter region:
 
 | Shape | Form | Examples |
 |---|---|---|
-| **Setting** | `<keyword> <value>` | `version 0.1`, `units mm`, `description "..."` |
+| **Setting** | `<keyword> <value>` | `version 0.2`, `units mm`, `description "..."` |
 | **Directive** | `<keyword> <args>` | `import "x.cadml"`, `interference-tolerance 0.01mm³` |
 | **Param binding** | `param <name> = <expression> [(constraints)]` | `param chord = 100`, `param d = 10 (min=3, max=30)` |
 
@@ -229,7 +229,7 @@ convention for readability, not a semantic constraint. Within each
 section, ordering rules:
 
 - **Settings**: any order.
-- **Imports**: any order. Imports do not depend on other imports in 0.1.
+- **Imports**: any order. Imports do not depend on other imports in 0.2.
 - **Params**: top-to-bottom evaluation. A param may reference any
   previously-declared param or imported Lua function in its expression;
   forward references are an error.
@@ -238,14 +238,14 @@ section, ordering rules:
 
 | Keyword | Value | Default | Description |
 |---|---|---|---|
-| `version` | spec version (e.g. `0.1` or `0.1.0`) | required | Major.minor or major.minor.patch; both forms accepted |
+| `version` | spec version (e.g. `0.2` or `0.2.0`) | required | Major.minor or major.minor.patch; both forms accepted |
 | `units` | `mm` / `cm` / `m` / `in` / `ft` | `mm` | Document numeric unit |
 | `description` | quoted string | empty | Human-readable description |
 | `tags` | quoted string (space-separated) | empty | Searchable tags |
 | `catalogue-version` | semver string (`major.minor.patch`) | empty | For catalogue parts only |
 | `interference-tolerance` | volume quantity | `0mm³` | Threshold below which `cadml_check` ignores overlaps |
 
-The `version` value accepts both short (`0.1`) and full (`0.1.0`) forms;
+The `version` value accepts both short (`0.2`) and full (`0.2.0`) forms;
 they are equivalent. Internally the compiler normalises to the
 three-component form.
 
@@ -283,7 +283,7 @@ Dispatch is by file extension:
 
 Cycles in `.cadml` import graphs are detected and reported as errors.
 Self-imports (a file importing itself) are also errors. `.lua` files
-cannot import other files in 0.1, so no `.lua` cycles are possible.
+cannot import other files in 0.2, so no `.lua` cycles are possible.
 
 ### 3.5 Params
 
@@ -363,7 +363,7 @@ helpful diagnostic listing nearby valid names.
 
 ### 4.3 Reserved built-in element names
 
-For CADML 0.1, the following 31 names are reserved and cannot be used as
+For CADML 0.2, the following 31 names are reserved and cannot be used as
 import aliases or `<def>` names:
 
 **Structural (9):**
@@ -376,7 +376,8 @@ import aliases or `<def>` names:
 `extrude`, `revolve`, `sweep`, `loft`, `helix`
 
 **Mesh import (1):**
-`stl`
+`stl` *(reserved since 0.2 — files declaring `version 0.1` may still use
+the name; see §15.2)*
 
 **Booleans + hull (4):**
 `union`, `difference`, `intersect`, `hull`
@@ -393,9 +394,11 @@ revisions of this spec carried a "reserved-but-deferred" note for
 `<sweep>`, `<helix>`, and `<loft>`; all three have since landed.
 
 The reserved set is pinned to the spec version declared in the file's
-frontmatter. A future spec (e.g. 0.2) adding new built-ins does not
-retroactively break files declaring `version 0.1` — those files keep
-the 0.1 reserved set.
+frontmatter. A spec version adding new built-ins does not retroactively
+break files declaring an older version — this happened in 0.2, when
+`stl` joined the reserved set: files declaring `version 0.1` keep the
+30-name 0.1 reserved set (so `stl` remains usable as a def or alias
+name there), while `version 0.2` files see all 31 names reserved.
 
 ### 4.4 Collision rule
 
@@ -564,7 +567,7 @@ The `color` attribute (also valid on `<part>` and `<def>`) accepts:
 - 3-digit hex with hash: `#RGB` (shorthand for `#RRGGBB`, e.g., `#4AB` =
   `#44AABB`)
 
-Other formats (named colors, RGBA, HSL) are **not** supported in 0.1.
+Other formats (named colors, RGBA, HSL) are **not** supported in 0.2.
 Alpha is always 1.0; transparency is a renderer concern, not a CADML
 attribute.
 
@@ -634,9 +637,9 @@ section**:
 ```
 
 (Treating `<script>` content as raw text per HTML's convention is on the
-0.2+ roadmap. Until then, the standard XML escaping rule applies.)
+0.3+ roadmap. Until then, the standard XML escaping rule applies.)
 
-Attributes: `lang="lua"` (only `lua` supported in 0.1).
+Attributes: `lang="lua"` (only `lua` supported in 0.2).
 
 #### `<for>` (authoring-only; compiled away)
 
@@ -731,12 +734,12 @@ Linearly extrude the contained 2D profile into 3D.
 
 Children: a 2D primitive (`<rect>`, `<circle>`, `<path>`) or a `<sketch>`.
 
-**Reserved attributes — rejected in 0.1.** The following attribute
-names are reserved for a future release; the v0.1 bundler and
+**Reserved attributes — rejected in 0.2.** The following attribute
+names are reserved for a future release; the bundler and
 evaluator both reject them with a clear error so authoring tools
 cannot quietly produce wrong geometry.
 
-| Attr | Reserved for | Workaround in 0.1 |
+| Attr | Reserved for | Workaround |
 |---|---|---|
 | `scale` | End-cap scale factor (tapered extrude) | Use `<loft>` between two scaled profiles. |
 | `draft` | Draft angle (sidewall taper) | Use `<loft>` between an offset profile pair. |
@@ -820,7 +823,9 @@ emits a warning.
 
 `<stl>` imports a triangle mesh from an STL blob and welds it into a solid
 that composes with the booleans (§5.5) and hull like any other 3D leaf — no
-special-casing. It is the mesh-native counterpart to importing a B-rep
+special-casing. Available since spec version **0.2**: a document using
+`<stl>` must declare `version 0.2` (in `version 0.1` files the name is
+not reserved — §15.2). It is the mesh-native counterpart to importing a B-rep
 model: take an existing part and edit it with CSG.
 
 The mesh comes from exactly one source:
@@ -833,7 +838,7 @@ The mesh comes from exactly one source:
   project root, are rejected.
 - **`data`** — the STL bytes embedded directly, encoded per `encoding`.
   This is the self-contained / single-file form (and what `src` compiles
-  to). `base64` is the only encoding in 0.1.
+  to). `base64` is the only encoding in 0.2.
 
 Both binary and ASCII STL are accepted; per-facet normals are ignored and
 recomputed from geometry. On import the mesh is passed through the CSG
@@ -860,10 +865,10 @@ attribute.
 |---|---|---|---|
 | `src` | path | — | `.stl` file, resolved relative to the document (authoring form) |
 | `data` | string | — | STL bytes embedded per `encoding` (self-contained form) |
-| `encoding` | enum | `base64` | Encoding of `data`; `base64` only in 0.1 |
+| `encoding` | enum | `base64` | Encoding of `data`; `base64` only in 0.2 |
 
 Intrinsic edits of the imported mesh itself (reshaping an existing feature)
-are out of scope for 0.1 — `<stl>` is a geometry source for compositing,
+are out of scope for 0.2 — `<stl>` is a geometry source for compositing,
 not a mesh editor.
 
 ### 5.5 Booleans
@@ -1118,10 +1123,10 @@ height="{a + b}"    expression
 | `*` `/` `%` | Multiplicative | |
 | `+` `-` | Additive | |
 
-The 0.1 expression grammar supports arithmetic (`+ - * / %`),
+The 0.2 expression grammar supports arithmetic (`+ - * / %`),
 parentheses, parameter references, and dotted-path Lua / native
 function calls. Comparison, logical, ternary, and exponentiation are
-not part of 0.1 — use a Lua helper for conditional logic. Example:
+not part of 0.2 — use a Lua helper for conditional logic. Example:
 `{my_module.choose(a, b, c)}` calling
 `function choose(a, b, c) if a > 0 then return b else return c end end`.
 
@@ -1290,9 +1295,9 @@ sealed in its own scope (Section 8.3).
 
 ### 8.5 Cross-script scope
 
-Imported `.lua` files cannot access each other's exports in 0.1 (each is
+Imported `.lua` files cannot access each other's exports in 0.2 (each is
 sealed in its own scope). Cross-module calls must go through the
-consuming `.cadml` file's expression scope. (Deferred to 0.2+.)
+consuming `.cadml` file's expression scope. (Deferred to 0.3+.)
 
 ---
 
@@ -1345,7 +1350,7 @@ runtime dependency without sacrificing parametric re-rendering.
 
 **Param-reference expressions** stay symbolic in the flat output. These
 are expressions that reference *only* frontmatter params, literals, and
-the 0.1 arithmetic operators (`+`, `-`, `*`, `/`, `%`, parens — see
+the 0.2 arithmetic operators (`+`, `-`, `*`, `/`, `%`, parens — see
 §7.2). The engine resolves them at evaluate time against the
 in-document `<param>` table:
 
@@ -1416,7 +1421,7 @@ Failures at any of these checks produce a hard error with source location:
 
 ```
 [ Frontmatter — settings only ]
-version 0.1
+version 0.2
 units mm
 description "..."
 
@@ -1669,7 +1674,7 @@ the user to recompile.
 
 The exact-dimension guarantees in this section (`radius` matches in
 §12.2, `distance` matches in §12.3, uniform `thickness` in §12.4)
-describe the **v0.1 reference engine** — the flat evaluator under
+describe the **reference engine** — the flat evaluator under
 `cadml::engine::evaluate_flat`, implemented in
 `src/engine/src/flat_geometry.cpp`. This is the engine the
 `cadmlstl`/`cadmlcheck`/`cadmlbuild` CLIs run, and the contract for
@@ -1886,7 +1891,7 @@ needed.
 
 ### 13.4 Combinators
 
-Selectors are single predicates in 0.1 — there are no logical
+Selectors are single predicates in 0.2 — there are no logical
 combinators (`and`, `or`, `not`). Complex selection is achieved
 through geometric decomposition (Section 12 — composition over
 generality).
@@ -1970,12 +1975,12 @@ escalate warnings to errors with `--strict`.
 
 ### 15.1 Spec versions
 
-CADML evolves incrementally. Each spec version (this document is `0.1`) is
+CADML evolves incrementally. Each spec version (this document is `0.2`) is
 identified by the string in `version` declarations.
 
 - **Patch (e.g., `0.1.1`)**: bug fixes only. No new elements, no schema
   changes. All `0.1.0` files parse identically under `0.1.1`.
-- **Minor (e.g., `0.1`)**: additive — new elements, new attributes, new
+- **Minor (e.g., `0.2`)**: additive — new elements, new attributes, new
   modifiers, new selectors. Existing files continue parsing under their
   declared version.
 - **Major (e.g., `1.0`)**: breaking changes. Old files require migration.
@@ -1993,10 +1998,16 @@ recognizes is an error.
 
 ### 15.3 Compatibility table
 
-A 0.1.x compiler accepts files that declare `version 0.1`. Any other
-literal version string (`0.2`, `1.0`, anything else) is rejected with
-an unrecognized-spec-version error. The compiler does not heuristically
-"degrade" newer files to 0.1 semantics.
+A compiler implementing spec 0.2 accepts files that declare `version
+0.1` or `version 0.2` (including patch forms such as `0.1.0` or
+`0.2.0`); each file is validated against the reserved set of the
+version *it* declares (§15.2). Any other literal version string
+(`0.3`, `1.0`, anything else) is rejected with an
+unrecognized-spec-version error. A document may import files declaring
+an equal-or-older spec version, never a newer one — the compiled flat
+document carries the entry file's version, so newer-spec vocabulary
+cannot be smuggled beneath an older declaration. The compiler does not
+heuristically "degrade" newer files to older semantics.
 
 ---
 
@@ -2058,4 +2069,4 @@ emits but the user never authors directly).
 
 ---
 
-*End of CADML 0.1 specification.*
+*End of CADML 0.2 specification.*

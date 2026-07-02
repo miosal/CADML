@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "V-belt pulley, A-section (5/8 in. nominal), 60 mm OD with a 19 mm bore. The meridional profile is a path with the standard 34-degree V-groove cut into the OD; revolving it around Z gives the full pulley body in one shot. Hub bore is a separate cylindrical extrude removed via difference."
 

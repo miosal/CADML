@@ -155,7 +155,7 @@ TEST(InMemory, StlAbsolutePathRejected) {
     auto r = compile_in_memory(
         files({
             { "main.cadml",
-              "version 0.1\n<part><stl src=\"/etc/passwd\"/></part>" },
+              "version 0.2\n<part><stl src=\"/etc/passwd\"/></part>" },
         }),
         "main.cadml");
     EXPECT_FALSE(r.ok());
@@ -171,7 +171,7 @@ TEST(InMemory, StlParentEscapeRejected) {
     auto r = compile_in_memory(
         files({
             { "main.cadml",
-              "version 0.1\n<part><stl src=\"../../escape.stl\"/></part>" },
+              "version 0.2\n<part><stl src=\"../../escape.stl\"/></part>" },
         }),
         "main.cadml");
     EXPECT_FALSE(r.ok());
@@ -190,7 +190,7 @@ TEST(InMemory, StlOversizeSourceRejected) {
         files({
             { "big.stl", std::string(cadml::kMaxSourceBytes + 1, 's') },
             { "main.cadml",
-              "version 0.1\n<part><stl src=\"big.stl\"/></part>" },
+              "version 0.2\n<part><stl src=\"big.stl\"/></part>" },
         }),
         "main.cadml");
     EXPECT_FALSE(r.ok());
@@ -212,7 +212,118 @@ TEST(InMemory, StlFlatOutputRecompilesClean) {
         files({
             { "cube.stl", "opaque bytes; resolution just embeds them" },
             { "main.cadml",
-              "version 0.1\n<part><stl src=\"cube.stl\"/></part>" },
+              "version 0.2\n<part><stl src=\"cube.stl\"/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    auto r2 = compile_string(r.flat_text);
+    EXPECT_TRUE(r2.ok()) << (r2.errors.empty() ? "" : r2.errors[0].message);
+}
+
+// ─── Spec versions across imports (§15.3) ───────────────────────────
+
+TEST(InMemory, ImportRequiringNewerSpecRejected) {
+    // A 0.1 entry importing a 0.2 file: the flat output would declare
+    // 0.1 yet contain 0.2 vocabulary, so it must be refused at the
+    // import site with a pointer at the fix.
+    auto r = compile_in_memory(
+        files({
+            { "mesh.cadml",
+              "version 0.2\n<part name=\"m\"><stl data=\"AAAA\"/></part>" },
+            { "main.cadml",
+              "version 0.1\nimport \"mesh.cadml\"\n"
+              "<part name=\"p\"><mesh/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("newer spec") != std::string::npos) found = true;
+    EXPECT_TRUE(found) << "0.1 entry must not import a 0.2 file";
+}
+
+TEST(InMemory, ImportOfOlderSpecFileAccepted) {
+    // A 0.2 entry importing a 0.1 library is fine — 0.1 vocabulary is a
+    // strict subset of 0.2's.
+    auto r = compile_in_memory(
+        files({
+            { "lib.cadml",
+              "version 0.1\n<part name=\"l\"><circle r=\"2\"/></part>" },
+            { "main.cadml",
+              "version 0.2\nimport \"lib.cadml\" as lib\n"
+              "<part name=\"p\"><lib/></part>" },
+        }),
+        "main.cadml");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+}
+
+TEST(InMemory, OlderImportUsingNewerReservedDefNameRejected) {
+    // The flat output declares the ENTRY's version. A 0.1 library may
+    // legally name a def `stl` (§15.2), but merged under a 0.2 entry
+    // that def would serialize as `<def name="stl">` in a file declaring
+    // 0.2 — where the name re-parses as the built-in, so the compile
+    // must fail rather than emit an artifact that cannot re-parse.
+    auto r = compile_in_memory(
+        files({
+            { "lib.cadml",
+              "version 0.1\n"
+              "<def name=\"stl\"><extrude height=\"1\">"
+              "<circle r=\"1\"/></extrude></def>\n"
+              "<part name=\"l\"><stl/></part>" },
+            { "main.cadml",
+              "version 0.2\nimport \"lib.cadml\" as lib\n"
+              "<part name=\"p\"><lib/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("collides with a built-in element name of the"
+                           " entry document's spec version 0.2")
+                != std::string::npos)
+            found = true;
+    EXPECT_TRUE(found)
+        << "0.1 import's `stl` namespace must be rejected under a 0.2 entry";
+}
+
+TEST(InMemory, OlderImportUsingNewerReservedAliasRejected) {
+    // Same rule via an import alias: a 0.1 file may alias an import as
+    // `stl` (§15.2); under a 0.2 entry that alias becomes a def named
+    // `stl` in the merged document and must be rejected.
+    auto r = compile_in_memory(
+        files({
+            { "thing.cadml",
+              "version 0.1\n<part name=\"t\"><circle r=\"1\"/></part>" },
+            { "lib.cadml",
+              "version 0.1\nimport \"thing.cadml\" as stl\n"
+              "<part name=\"l\"><stl/></part>" },
+            { "main.cadml",
+              "version 0.2\nimport \"lib.cadml\" as lib\n"
+              "<part name=\"p\"><lib/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    bool found = false;
+    for (const auto& e : r.errors)
+        if (e.message.find("collides with a built-in") != std::string::npos)
+            found = true;
+    EXPECT_TRUE(found);
+}
+
+TEST(InMemory, OlderImportWithUnreservedNamesStillAcceptedUnderNewerEntry) {
+    // Control for the two tests above: a 0.1 import whose namespace
+    // avoids newer-reserved names composes cleanly into a 0.2 entry,
+    // and the flat output re-parses (compiles) clean.
+    auto r = compile_in_memory(
+        files({
+            { "lib.cadml",
+              "version 0.1\n"
+              "<def name=\"widget\"><extrude height=\"1\">"
+              "<circle r=\"1\"/></extrude></def>\n"
+              "<part name=\"l\"><widget/></part>" },
+            { "main.cadml",
+              "version 0.2\nimport \"lib.cadml\" as lib\n"
+              "<part name=\"p\"><lib/></part>" },
         }),
         "main.cadml");
     ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);

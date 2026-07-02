@@ -372,13 +372,16 @@ struct TypedAttrs {
     NodeAttrs attrs;
 };
 
-TypedAttrs classify(const pugi::xml_node& n) {
+TypedAttrs classify(const pugi::xml_node& n, SpecVersion spec) {
     const std::string_view name = n.name();
-    const NodeType bt = node_type_from_builtin_name(name);
+    const NodeType bt = node_type_from_builtin_name(name, spec);
 
     if (bt == NodeType::Unknown) {
         // Identifier-like names are instance references; anything else
-        // is an unknown element (parser-level error follows).
+        // is an unknown element (parser-level error follows). A name
+        // reserved only by a NEWER spec than this file declares lands
+        // here too (§15.2 pinning) — it stays an ordinary instance
+        // reference, resolvable against the file's own defs/imports.
         if (!name.empty() &&
             ((name[0] >= 'a' && name[0] <= 'z'))) {
             return { NodeType::Instance, build_instance_attrs(n) };
@@ -440,6 +443,8 @@ struct Walker {
     const LineIndex&       line_index;
     std::size_t            prefix_len;
     SourceFileId           file_id;
+    SpecVersion            spec;    // declared spec version — selects the
+                                    // reserved built-in set (§15.2)
 
     // SECURITY: cap XML nesting depth to prevent stack overflow on
     // pathological inputs (e.g. 100k nested `<group>` elements). 256
@@ -494,7 +499,7 @@ struct Walker {
             }
         }
 
-        auto typed = classify(xml_node);
+        auto typed = classify(xml_node, spec);
 
         if (typed.type == NodeType::Unknown) {
             push_error(ParseError::Vocabulary,
@@ -536,7 +541,8 @@ struct Walker {
             if (da.name.empty()) {
                 push_error(ParseError::Schema,
                     "<def> requires a `name` attribute", range);
-            } else if (node_type_from_builtin_name(da.name) != NodeType::Unknown) {
+            } else if (node_type_from_builtin_name(da.name, spec)
+                           != NodeType::Unknown) {
                 push_error(ParseError::Vocabulary,
                     "<def name=\"" + da.name + "\"> collides with a built-in"
                     " element name", range);
@@ -643,7 +649,8 @@ const char* find_forbidden_xml_node(const pugi::xml_node& root) {
 // ─── Public entry ───────────────────────────────────────────────────────
 
 BodyResult parse_body(std::string_view body, SourceFileId file_id,
-                       std::uint32_t body_line_offset) {
+                       std::uint32_t body_line_offset,
+                       SpecVersion spec) {
     BodyResult out;
 
     if (body.empty() || std::all_of(body.begin(), body.end(),
@@ -686,10 +693,10 @@ BodyResult parse_body(std::string_view body, SourceFileId file_id,
         // pugixml's generic text.
         if (load_result.status == pugi::status_bad_pi) {
             e.message = "XML processing instructions (`<?…?>`) are not "
-                        "permitted in CADML 0.1";
+                        "permitted in CADML";
         } else if (load_result.status == pugi::status_bad_doctype) {
             e.message = "XML DOCTYPE declarations are not permitted in "
-                        "CADML 0.1";
+                        "CADML";
         } else {
             e.message = std::string("XML parse error: ")
                       + load_result.description();
@@ -723,13 +730,13 @@ BodyResult parse_body(std::string_view body, SourceFileId file_id,
         ParseError e;
         e.category = ParseError::Parse;
         e.message  = std::string("XML ") + forbidden +
-                     " is not permitted in CADML 0.1";
+                     " is not permitted in CADML";
         e.source.file = file_id;
         out.errors.push_back(std::move(e));
         return out;
     }
 
-    Walker walker{ out, line_index, kPrefix.size(), file_id };
+    Walker walker{ out, line_index, kPrefix.size(), file_id, spec };
 
     // Walk top-level children.
     std::uint32_t prev_sibling = NO_NODE;
@@ -801,7 +808,11 @@ ParseResult parse(std::string_view source, SourceFileId file_id) {
                 break;
             }
         }
-        auto body = parse_body(body_view, file_id, body_line);
+        // meta was moved into the document above — read the version from
+        // its final home, not the moved-from frontmatter result.
+        auto body = parse_body(
+            body_view, file_id, body_line,
+            spec_version_from_string(result.document.meta.version));
         result.document.nodes   = std::move(body.nodes);
         result.document.defs    = std::move(body.defs);
         result.document.exports = std::move(body.exports);

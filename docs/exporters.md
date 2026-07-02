@@ -170,10 +170,10 @@ my-part.3mf  (ZIP archive)
 ### 2.3 What's deferred
 
 - **3MF Materials extension** (PBR, textures, finishing). Base colors
-  only in 0.1.
+  only in 0.2.
 - **3MF Production extension** (object UUIDs for replaceable parts).
 - **Per-triangle material assignment.** Would require splitting a
-  part along its `face_groups` boundaries; not justified for the v0.1
+  part along its `face_groups` boundaries; not justified for the
   per-part model.
 
 ### 2.4 CLI
@@ -280,7 +280,7 @@ uses a single buffer (one binary blob) for the entire file.
 ### 4.3 Per-vertex normals
 
 The exporter emits a `NORMAL` accessor only when the engine produced
-non-zero per-vertex normals for the mesh. The 0.1 primitive
+non-zero per-vertex normals for the mesh. The primitive
 constructors leave `FlatMesh::normals` populated with zero vectors,
 and the exporter detects that case and skips the NORMAL attribute
 entirely — consumers then fall back to face normals (flat shading).

@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Miter / bevel / compound demo. Picture frame at the origin: 4 square-tube rails, each end cut with `<cut type='miter' angle='±45'>` so adjacent rails butt cleanly at 90° corners. Off to one side, three single-rail demos with one square end and one cut end show what each <cut> type does in isolation: a pure miter (Y-axis tilt → horizontal angle), a pure bevel (X-axis tilt → vertical angle), and a compound (both at once → tilted-and-skewed face, the cut you machine for hopper corner posts, hip rafters, or angled crown molding)."
 

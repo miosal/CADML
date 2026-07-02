@@ -18,7 +18,7 @@ namespace {
 
 void print_usage() {
     std::cerr <<
-        "cadmlc — CADML 0.1 bundler\n"
+        "cadmlc — CADML bundler\n"
         "\n"
         "Usage:\n"
         "  cadmlc <entry.cadml> [-o <output.fcadml>] [--strip-sources]\n"

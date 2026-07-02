@@ -5172,7 +5172,7 @@ std::string make_cube_stl_ascii(double size) {
 // cylinder (an extruded circle) via `op`, then evaluate it.
 FlatEvalResult eval_stl_op(std::string_view op, const std::string& stl_bytes) {
     const std::string doc =
-        "version 0.1\n"
+        "version 0.2\n"
         "<part name=\"p\">\n"
         "  <" + std::string(op) + ">\n"
         "    <stl src=\"cube.stl\"/>\n"
@@ -5248,7 +5248,7 @@ TEST(FlatStlImport, TrianglesAttributedToStlNode) {
     // cadmltopo, glTF extras), not to node 0 / the enclosing <part>.
     std::vector<cadml::compile::InMemoryFile> files = {
         { "part.cadml",
-          "version 0.1\n<part name=\"p\"><stl src=\"cube.stl\"/></part>\n" },
+          "version 0.2\n<part name=\"p\"><stl src=\"cube.stl\"/></part>\n" },
         { "cube.stl", make_cube_stl(10.0) }};
     auto cr = cadml::compile::compile_in_memory(files, "part.cadml");
     ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
@@ -5278,7 +5278,7 @@ TEST(FlatStlImport, BestEffortMeshKeepsSizeInvariants) {
     // native sibling misaligns attribution for the whole part.
     std::vector<cadml::compile::InMemoryFile> files = {
         { "part.cadml",
-          "version 0.1\n<part name=\"p\"><stl src=\"holed.stl\"/></part>\n" },
+          "version 0.2\n<part name=\"p\"><stl src=\"holed.stl\"/></part>\n" },
         { "holed.stl", make_cube_stl(10.0, /*drop_last=*/true) }};
     auto cr = cadml::compile::compile_in_memory(files, "part.cadml");
     ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
@@ -5339,7 +5339,7 @@ TEST(FlatStlImport, EmbeddedBase64DataForm) {
     // authored directly. base64 of a small binary cube, inline.
     const std::string b64 = cadml::base64_encode(make_cube_stl(10.0));
     const std::string doc =
-        "version 0.1\n<part name=\"p\"><stl data=\"" + b64 + "\"/></part>\n";
+        "version 0.2\n<part name=\"p\"><stl data=\"" + b64 + "\"/></part>\n";
     auto cr = cadml::compile::compile_string(doc);
     ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
     auto r = evaluate_flat(cr.document);
@@ -5353,7 +5353,7 @@ TEST(FlatStlImport, MalformedBase64DataIsDiagnosticNotCrash) {
     // Hostile/corrupt `data` must degrade to a diagnostic and an empty
     // mesh — never a crash or partial decode reaching the geometry.
     auto cr = cadml::compile::compile_string(
-        "version 0.1\n<part name=\"p\"><stl data=\"!!!not-base64!!!\"/></part>\n");
+        "version 0.2\n<part name=\"p\"><stl data=\"!!!not-base64!!!\"/></part>\n");
     ASSERT_TRUE(cr.ok()) << (cr.errors.empty() ? "" : cr.errors[0].message);
     auto r = evaluate_flat(cr.document);
     EXPECT_TRUE(any_warning_contains(r, "not valid base64"));
@@ -5361,10 +5361,23 @@ TEST(FlatStlImport, MalformedBase64DataIsDiagnosticNotCrash) {
     EXPECT_EQ(r.parts[0].mesh.triangle_count(), 0u);
 }
 
+TEST(FlatStlImport, StlInSpec01DocumentWarnsWithVersionHint) {
+    // §15.2 pinning: `stl` is not reserved in a `version 0.1` document,
+    // so the element parses as an ordinary instance reference — and the
+    // unresolved-ref diagnostic points at the outdated version
+    // declaration rather than leaving the author guessing.
+    auto doc = parse_authoring(
+        "version 0.1\n<part name=\"p\"><stl data=\"AAAA\"/></part>");
+    auto r = evaluate_flat(doc);
+    EXPECT_TRUE(any_warning_contains(r, "since spec version 0.2"));
+    ASSERT_EQ(r.parts.size(), 1u);
+    EXPECT_EQ(r.parts[0].mesh.triangle_count(), 0u);
+}
+
 TEST(FlatStlImport, MissingSourceFileIsCompileError) {
     std::vector<cadml::compile::InMemoryFile> files = {
         { "part.cadml",
-          "version 0.1\n<part name=\"p\"><stl src=\"nope.stl\"/></part>\n" }};
+          "version 0.2\n<part name=\"p\"><stl src=\"nope.stl\"/></part>\n" }};
     auto cr = cadml::compile::compile_in_memory(files, "part.cadml");
     EXPECT_FALSE(cr.ok());
     EXPECT_TRUE(std::any_of(cr.errors.begin(), cr.errors.end(),

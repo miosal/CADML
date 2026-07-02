@@ -1,5 +1,6 @@
 import { Showcase }            from '@/components/Showcase';
 import { GitHubIcon, ExternalLinkIcon } from '@/components/Icons';
+import { CADML_SOFTWARE_VERSION } from '@/lib/cadml-version';
 
 const REPO_URL = 'https://github.com/miosal/cadml';
 const SPEC_URL = 'https://github.com/miosal/cadml/blob/main/docs/spec/language.md';
@@ -256,7 +257,7 @@ export default function Home() {
 
       <footer className="border-t border-zinc-200 mt-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 text-sm text-zinc-500 flex flex-wrap items-center gap-x-4 gap-y-2 justify-between">
-          <span>CADML 0.1 · © {new Date().getFullYear()} miosal</span>
+          <span>CADML v{CADML_SOFTWARE_VERSION} · © {new Date().getFullYear()} miosal</span>
           <a
             href={REPO_URL}
             className="inline-flex items-center gap-1.5 hover:text-zinc-900"

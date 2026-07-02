@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Five-pointed star — concave 10-vertex profile written with relative-coordinate <path> (lowercase l + z). The profile has 5 reflex (inner) vertices and 5 convex (outer) ones; the tessellator handles ear-clipping over the full concave polygon."
 

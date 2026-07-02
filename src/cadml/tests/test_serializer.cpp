@@ -277,7 +277,7 @@ TEST(Serializer, StlSrcRoundTrips) {
     // Authoring form: a bare `src` path. Round-trips as-is (the bundler,
     // not the parser/serializer, is what lowers `src` to `data`).
     auto rt = round_trip(
-        "version 0.1\n"
+        "version 0.2\n"
         "<part>\n"
         "  <union>\n"
         "    <stl src=\"cube.stl\"/>\n"
@@ -294,7 +294,7 @@ TEST(Serializer, StlEmbeddedDataRoundTrips) {
     // Flat / self-contained form: base64 `data`. The default `base64`
     // encoding is elided on emit, so it must re-parse back to base64.
     auto rt = round_trip(
-        "version 0.1\n"
+        "version 0.2\n"
         "<part><stl data=\"QUJDRA==\"/></part>\n");
     ASSERT_EQ(rt.b.nodes[1].type, NodeType::Stl);
     const auto& a = std::get<StlAttrs>(rt.b.nodes[1].attrs);

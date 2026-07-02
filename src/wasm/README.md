@@ -1,6 +1,6 @@
 # CADML → WebAssembly
 
-A WebAssembly build of CADML's v0.1 flat pipeline (parse → bundle →
+A WebAssembly build of CADML's flat pipeline (parse → bundle →
 evaluate → STL / 3MF / glTF), exposed to JavaScript via embind. Lets a
 browser-side caller compile `.cadml` and export geometry with **no
 filesystem access** — multi-file projects come in through the

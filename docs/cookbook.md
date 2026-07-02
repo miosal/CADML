@@ -4,7 +4,7 @@ Common CADML patterns and the canonical way to write them.
 
 The cookbook assumes you already know:
 
-- Frontmatter is line-oriented (`version 0.1`, `units mm`,
+- Frontmatter is line-oriented (`version 0.2`, `units mm`,
   `param name = value`), **terminates at the first `<`**.
 - The body has one or more top-level `<part>`/`<assembly>` exports
   plus optional `<def>`s and `<script>`s. The common case is one
@@ -33,7 +33,7 @@ recipes on top.
 Structural (9):       part def assembly connect port group script for svg
 2D primitives (4):    circle rect path sketch
 2D → 3D (5):          extrude revolve sweep loft helix
-Mesh import (1):      stl
+Mesh import (1):      stl                        (since spec 0.2)
 Booleans + hull (4):  union difference intersect hull
 Modifiers (5):        fillet chamfer shell cut pattern
 Flat-output (3):      param sources source     (compiler-emitted)
@@ -55,7 +55,7 @@ a `param`, body uses one `<difference>` of an extruded rect minus two
 overshooting cylinders.
 
 ```
-version 0.1
+version 0.2
 units mm
 description "Mounting plate with two through-holes."
 
@@ -162,7 +162,7 @@ wrapping" gotcha for the engine reality vs spec aspiration.
 
 For a swept hub or bell-shaped profile, generate the `d=` string from
 Lua and inline it as `<path d="{my_module.hub_profile(...)}"/>` — that
-is how `examples/v0.1/compressor` builds its bell.
+is how `examples/compressor` builds its bell.
 
 For a partial revolve (an arc, a fan): `angle="180"`.
 
@@ -278,7 +278,7 @@ end
 **File: `wing.cadml`** (the part that consumes it)
 
 ```
-version 0.1
+version 0.2
 units mm
 description "Trapezoidal wing: extruded NACA-2412 cross-section."
 
@@ -323,7 +323,7 @@ Reusable geometry block + N call sites, all in one file. The `<def>`
 as an element — there is **no `<use>` tag**.
 
 ```
-version 0.1
+version 0.2
 units mm
 
 param plate-t = 6
@@ -476,7 +476,7 @@ on each imported `<part>` define the mating frames.
 **File: `motor.cadml`**
 
 ```
-version 0.1
+version 0.2
 units mm
 
 param body-l = 50
@@ -494,7 +494,7 @@ param body-r = 20
 **File: `drivetrain.cadml`**
 
 ```
-version 0.1
+version 0.2
 units mm
 
 import "motor.cadml" as motor

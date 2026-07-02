@@ -19,6 +19,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The software version has one source of truth: project(VERSION …)
+      # in CMakeLists.txt (README, the web footer, and the vendored
+      # artifact stamps all derive from it). Two guards:
+      #  - every run: the checked-in generated web version file and the
+      #    vendored wasm artifact names must match the project version —
+      #    catching a version bump that forgot `pnpm wasm:refresh` at the
+      #    PR that introduces it, not at release time;
+      #  - releases only: the git tag must match too. A release that
+      #    disagrees is mislabelled — fail instead of shipping it.
+      - name: Verify version stamps match project version
+        run: |
+          ver=$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt | head -1)
+          mm=${ver%.*}
+          fail=0
+          if ! grep -q "CADML_VERSION = '$mm'" web/lib/cadml-version.ts; then
+            echo "::error::web/lib/cadml-version.ts CADML_VERSION != $mm — run pnpm wasm:refresh"
+            fail=1
+          fi
+          if ! grep -q "CADML_SOFTWARE_VERSION = '$ver'" web/lib/cadml-version.ts; then
+            echo "::error::web/lib/cadml-version.ts CADML_SOFTWARE_VERSION != $ver — run pnpm wasm:refresh"
+            fail=1
+          fi
+          for f in web/public/wasm/cadml-$mm.js web/public/wasm/cadml-$mm.wasm; do
+            if [ ! -f "$f" ]; then
+              echo "::error::missing vendored artifact $f for project version $ver — run pnpm wasm:refresh"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Verify release tag matches project version
+        if: github.event_name == 'release'
+        run: |
+          ver=$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt | head -1)
+          if [ "v$ver" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::release tag $GITHUB_REF_NAME != project version v$ver (CMakeLists.txt)"
+            exit 1
+          fi
+
       - name: Set up Node (to run the wasm module)
         uses: actions/setup-node@v4
         with:

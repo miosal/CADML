@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Helical compression spring, 5 mm OD x 0.5 mm wire, 16 active coils on a 2 mm pitch. Exercises <sweep> + <helix> on a profile centred on the helix axis (so the wire wraps around the spring axis rather than spiralling around its own centreline). For a closed-end ground-flat spring the top and bottom coils would be tighter and ground perpendicular; this geometry skips those finishing details."
 

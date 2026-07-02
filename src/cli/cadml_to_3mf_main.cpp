@@ -20,7 +20,7 @@ namespace {
 
 void print_usage(std::ostream& os) {
     os <<
-        "cadml3mf - CADML 0.1 3MF exporter\n"
+        "cadml3mf - CADML 3MF exporter\n"
         "\n"
         "Usage:\n"
         "  cadml3mf <entry.cadml> -o <out.3mf> [options]\n"

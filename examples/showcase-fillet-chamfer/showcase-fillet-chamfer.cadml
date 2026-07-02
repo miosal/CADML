@@ -1,4 +1,4 @@
-version 0.1
+version 0.2
 units mm
 description "Six side-by-side blocks demonstrating the <fillet>, <chamfer>, and <shell> modifiers. Each block is the same 30×30×20 cuboid as the baseline (block 1); blocks 2–6 wrap it in one modifier element each."
 
@@ -51,7 +51,7 @@ param x0      = {-spacing * 2.5}
      lets us pick which edges the modifier touches.
      `edge:position.z=20` matches edges whose midpoint sits at
      the top face's z (= `height`); the four bottom edges and the
-     four vertical edges stay sharp. The 0.1 selector grammar takes
+     four vertical edges stay sharp. The 0.2 selector grammar takes
      literal numbers only — `{height}` would be rejected. -->
 <part name="top-fillet" color="#c47a4a">
   <group transform="translate({x0 + spacing * 3}, 0, 0)">
@@ -80,7 +80,7 @@ param x0      = {-spacing * 2.5}
      opens cap faces. `open="end"` removes the top, leaving a cup;
      `start` opens the bottom; `both` leaves an open-ended tube.
 
-     The 0.1 <shell> wants a literal <extrude> as its direct child
+     The 0.2 <shell> wants a literal <extrude> as its direct child
      (Tier 1 input predicate), so we re-author the cuboid inline
      rather than instancing the <block> def. -->
 <part name="shell-open-top" color="#c4ae4a">
