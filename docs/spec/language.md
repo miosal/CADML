@@ -88,7 +88,7 @@ A `.cadml` file consists of a frontmatter block followed by an XML body:
 
 ```
 [ Frontmatter — line-oriented ]
-version 0.1
+version 0.2
 units mm
 description "..."
 tags "..."
@@ -207,7 +207,7 @@ Three statement shapes share the frontmatter region:
 
 | Shape | Form | Examples |
 |---|---|---|
-| **Setting** | `<keyword> <value>` | `version 0.1`, `units mm`, `description "..."` |
+| **Setting** | `<keyword> <value>` | `version 0.2`, `units mm`, `description "..."` |
 | **Directive** | `<keyword> <args>` | `import "x.cadml"`, `interference-tolerance 0.01mm³` |
 | **Param binding** | `param <name> = <expression> [(constraints)]` | `param chord = 100`, `param d = 10 (min=3, max=30)` |
 
@@ -229,7 +229,7 @@ convention for readability, not a semantic constraint. Within each
 section, ordering rules:
 
 - **Settings**: any order.
-- **Imports**: any order. Imports do not depend on other imports in 0.1.
+- **Imports**: any order. Imports do not depend on other imports in 0.2.
 - **Params**: top-to-bottom evaluation. A param may reference any
   previously-declared param or imported Lua function in its expression;
   forward references are an error.
@@ -283,7 +283,7 @@ Dispatch is by file extension:
 
 Cycles in `.cadml` import graphs are detected and reported as errors.
 Self-imports (a file importing itself) are also errors. `.lua` files
-cannot import other files in 0.1, so no `.lua` cycles are possible.
+cannot import other files in 0.2, so no `.lua` cycles are possible.
 
 ### 3.5 Params
 
@@ -567,7 +567,7 @@ The `color` attribute (also valid on `<part>` and `<def>`) accepts:
 - 3-digit hex with hash: `#RGB` (shorthand for `#RRGGBB`, e.g., `#4AB` =
   `#44AABB`)
 
-Other formats (named colors, RGBA, HSL) are **not** supported in 0.1.
+Other formats (named colors, RGBA, HSL) are **not** supported in 0.2.
 Alpha is always 1.0; transparency is a renderer concern, not a CADML
 attribute.
 
@@ -639,7 +639,7 @@ section**:
 (Treating `<script>` content as raw text per HTML's convention is on the
 0.2+ roadmap. Until then, the standard XML escaping rule applies.)
 
-Attributes: `lang="lua"` (only `lua` supported in 0.1).
+Attributes: `lang="lua"` (only `lua` supported in 0.2).
 
 #### `<for>` (authoring-only; compiled away)
 
@@ -734,12 +734,12 @@ Linearly extrude the contained 2D profile into 3D.
 
 Children: a 2D primitive (`<rect>`, `<circle>`, `<path>`) or a `<sketch>`.
 
-**Reserved attributes — rejected in 0.1.** The following attribute
+**Reserved attributes — rejected in 0.2.** The following attribute
 names are reserved for a future release; the v0.1 bundler and
 evaluator both reject them with a clear error so authoring tools
 cannot quietly produce wrong geometry.
 
-| Attr | Reserved for | Workaround in 0.1 |
+| Attr | Reserved for | Workaround |
 |---|---|---|
 | `scale` | End-cap scale factor (tapered extrude) | Use `<loft>` between two scaled profiles. |
 | `draft` | Draft angle (sidewall taper) | Use `<loft>` between an offset profile pair. |
@@ -1126,7 +1126,7 @@ height="{a + b}"    expression
 The 0.1 expression grammar supports arithmetic (`+ - * / %`),
 parentheses, parameter references, and dotted-path Lua / native
 function calls. Comparison, logical, ternary, and exponentiation are
-not part of 0.1 — use a Lua helper for conditional logic. Example:
+not part of 0.2 — use a Lua helper for conditional logic. Example:
 `{my_module.choose(a, b, c)}` calling
 `function choose(a, b, c) if a > 0 then return b else return c end end`.
 
@@ -1295,7 +1295,7 @@ sealed in its own scope (Section 8.3).
 
 ### 8.5 Cross-script scope
 
-Imported `.lua` files cannot access each other's exports in 0.1 (each is
+Imported `.lua` files cannot access each other's exports in 0.2 (each is
 sealed in its own scope). Cross-module calls must go through the
 consuming `.cadml` file's expression scope. (Deferred to 0.2+.)
 
@@ -1421,7 +1421,7 @@ Failures at any of these checks produce a hard error with source location:
 
 ```
 [ Frontmatter — settings only ]
-version 0.1
+version 0.2
 units mm
 description "..."
 
@@ -1891,7 +1891,7 @@ needed.
 
 ### 13.4 Combinators
 
-Selectors are single predicates in 0.1 — there are no logical
+Selectors are single predicates in 0.2 — there are no logical
 combinators (`and`, `or`, `not`). Complex selection is achieved
 through geometric decomposition (Section 12 — composition over
 generality).

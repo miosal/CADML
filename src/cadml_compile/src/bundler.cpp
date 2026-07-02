@@ -992,7 +992,7 @@ void check_unsupported_constructs(const Document& doc,
                 CompileError e;
                 e.category = CompileError::Schema;
                 e.message  = std::string("<extrude ") + std::string(attr_name) +
-                    "=\"" + value + "\"> is not supported in 0.1; " +
+                    "=\"" + value + "\"> is not supported; " +
                     std::string(hint);
                 e.source = n.source;
                 errors.push_back(std::move(e));

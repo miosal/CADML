@@ -764,7 +764,7 @@ FlatMesh eval_3d(const Document& doc, const Node& n,
                 !direction_is_plus_z(a.direction_expr)) {
                 warnings.push_back({
                     "<extrude scale=|draft=|direction=> is not supported "
-                    "in 0.1 — remove the attribute or use <loft> for a "
+                    "— remove the attribute or use <loft> for a "
                     "tapered profile.",
                     n.source });
                 return {};

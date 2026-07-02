@@ -19,7 +19,7 @@ const FRONTMATTER_KEYWORDS = [
   'version', 'units', 'description', 'param', 'import',
 ];
 
-// Element names defined by the CADML 0.1 spec, mirrored verbatim
+// Element names defined by the CADML spec, mirrored verbatim
 // from src/cadml/src/types.cpp. Tokenised as `type` so they pick up
 // a different theme colour than ad-hoc tags (which fall through to
 // `tag`). Excludes the flat-output-only tags param/source/sources
