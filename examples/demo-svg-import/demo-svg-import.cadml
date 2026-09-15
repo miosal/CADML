@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Demonstrates <svg> by importing an SVG-coordinate snippet and extruding it. Shows three patterns: standalone extrude (paths land in -y as they would on screen), <svg> in a <difference> (cut SVG-traced shapes out of a plate), and <svg> with <rect>/<circle> (non-path primitives also follow SVG y-down). Open in a 3D viewer to verify rendering from any angle."
 

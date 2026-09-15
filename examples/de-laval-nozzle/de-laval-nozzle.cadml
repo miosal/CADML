@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "De Laval converging-diverging nozzle for a small bipropellant upper-stage motor. 80 mm chamber, 24 mm throat, 150 mm bell exit (expansion area-ratio ≈ 39:1, vacuum-class). The bell profile is an approximate Rao 80% contour traced as a parametric polyline along the divergent section; the convergent half is a conic frustum from chamber radius to throat radius. The mounting flange at the injector end carries an 8-bolt PCD96 pattern. Single revolved blank, hollowed by a second revolve of the inner gas-path profile, with the bolt holes punched through the flange. One <part>."
 

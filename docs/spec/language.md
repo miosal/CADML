@@ -229,7 +229,7 @@ convention for readability, not a semantic constraint. Within each
 section, ordering rules:
 
 - **Settings**: any order.
-- **Imports**: any order. Imports do not depend on other imports in 0.2.
+- **Imports**: any order. Imports do not depend on other imports in 0.3.
 - **Params**: top-to-bottom evaluation. A param may reference any
   previously-declared param or imported Lua function in its expression;
   forward references are an error.
@@ -283,7 +283,7 @@ Dispatch is by file extension:
 
 Cycles in `.cadml` import graphs are detected and reported as errors.
 Self-imports (a file importing itself) are also errors. `.lua` files
-cannot import other files in 0.2, so no `.lua` cycles are possible.
+cannot import other files in 0.3, so no `.lua` cycles are possible.
 
 ### 3.5 Params
 
@@ -616,7 +616,7 @@ The `color` attribute (also valid on `<part>` and `<def>`) accepts:
 - 3-digit hex with hash: `#RGB` (shorthand for `#RRGGBB`, e.g., `#4AB` =
   `#44AABB`)
 
-Other formats (named colors, RGBA, HSL) are **not** supported in 0.2.
+Other formats (named colors, RGBA, HSL) are **not** supported in 0.3.
 Alpha is always 1.0; transparency is a renderer concern, not a CADML
 attribute.
 
@@ -688,7 +688,7 @@ section**:
 (Treating `<script>` content as raw text per HTML's convention is on the
 0.3+ roadmap. Until then, the standard XML escaping rule applies.)
 
-Attributes: `lang="lua"` (only `lua` supported in 0.2).
+Attributes: `lang="lua"` (only `lua` supported in 0.3).
 
 #### `<for>` (authoring-only; compiled away)
 
@@ -783,7 +783,7 @@ Linearly extrude the contained 2D profile into 3D.
 
 Children: a 2D primitive (`<rect>`, `<circle>`, `<path>`) or a `<sketch>`.
 
-**Reserved attributes — rejected in 0.2.** The following attribute
+**Reserved attributes — rejected in 0.3.** The following attribute
 names are reserved for a future release; the bundler and
 evaluator both reject them with a clear error so authoring tools
 cannot quietly produce wrong geometry.
@@ -887,7 +887,7 @@ The mesh comes from exactly one source:
   project root, are rejected.
 - **`data`** — the STL bytes embedded directly, encoded per `encoding`.
   This is the self-contained / single-file form (and what `src` compiles
-  to). `base64` is the only encoding in 0.2.
+  to). `base64` is the only encoding in 0.3.
 
 Both binary and ASCII STL are accepted; per-facet normals are ignored and
 recomputed from geometry. On import the mesh is passed through the CSG
@@ -914,10 +914,10 @@ attribute.
 |---|---|---|---|
 | `src` | path | — | `.stl` file, resolved relative to the document (authoring form) |
 | `data` | string | — | STL bytes embedded per `encoding` (self-contained form) |
-| `encoding` | enum | `base64` | Encoding of `data`; `base64` only in 0.2 |
+| `encoding` | enum | `base64` | Encoding of `data`; `base64` only in 0.3 |
 
 Intrinsic edits of the imported mesh itself (reshaping an existing feature)
-are out of scope for 0.2 — `<stl>` is a geometry source for compositing,
+are out of scope for 0.3 — `<stl>` is a geometry source for compositing,
 not a mesh editor.
 
 ### 5.5 Booleans
@@ -1172,7 +1172,7 @@ height="{a + b}"    expression
 | `*` `/` `%` | Multiplicative | |
 | `+` `-` | Additive | |
 
-The 0.2 expression grammar supports arithmetic (`+ - * / %`),
+The 0.3 expression grammar supports arithmetic (`+ - * / %`),
 parentheses, parameter references, and dotted-path Lua / native
 function calls. Comparison, logical, ternary, and exponentiation are
 not part of 0.2 — use a Lua helper for conditional logic. Example:
@@ -1344,7 +1344,7 @@ sealed in its own scope (Section 8.3).
 
 ### 8.5 Cross-script scope
 
-Imported `.lua` files cannot access each other's exports in 0.2 (each is
+Imported `.lua` files cannot access each other's exports in 0.3 (each is
 sealed in its own scope). Cross-module calls must go through the
 consuming `.cadml` file's expression scope. (Deferred to 0.3+.)
 
@@ -1943,7 +1943,7 @@ needed.
 
 ### 13.4 Combinators
 
-Selectors are single predicates in 0.2 — there are no logical
+Selectors are single predicates in 0.3 — there are no logical
 combinators (`and`, `or`, `not`). Complex selection is achieved
 through geometric decomposition (Section 12 — composition over
 generality).
@@ -2061,7 +2061,9 @@ unrecognized-spec-version error.
 |---|---|
 | 0.1 | Initial language: 30 built-in element names |
 | 0.2 | `<stl>` mesh import (31 names) |
-| 0.3 | `texture` / `texture-data` / `texture-type` / `texture-scale` attributes on `<part>` and `<def>`; no new element names | A document may import files declaring
+| 0.3 | `texture` / `texture-data` / `texture-type` / `texture-scale` attributes on `<part>` and `<def>`; no new element names |
+
+A document may import files declaring
 an equal-or-older spec version, never a newer one — the compiled flat
 document carries the entry file's version, so newer-spec vocabulary
 cannot be smuggled beneath an older declaration. The compiler does not

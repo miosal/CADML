@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Slip-on pipe flange in the geometry family of ANSI B16.5 NPS-1 Class 150 (108 mm OD, 79.4 mm bolt circle, 2 in raised face, 35 mm bore) but drilled for four M16-clearance bolts instead of the standard imperial 5/8\" UNC. The bolt-circle is generated with one `<pattern type=\"circular\" count=\"4\">`. Stepped raised face uses two stacked extrudes; a single revolve would also work for a smoother chamfered profile."
 

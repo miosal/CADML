@@ -28,7 +28,7 @@ Lowercase variants — `m`, `l`, `h`, `v`, `a`, `c`, `s`, `q`, `t`, `z` —
 use **relative** coordinates: each coordinate is added to the current
 cursor position.
 
-**Not supported in 0.2:**
+**Not supported in 0.3:**
 
 | Feature | Reason |
 |---|---|

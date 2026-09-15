@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Demonstrates <hull> — the simple-loft case (square -> circle, square -> bigger square / frustum) plus a single-input hull around protrusions. Four parts laid out side-by-side."
 

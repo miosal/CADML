@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Flat mounting plate with a single bolt hole and a `<port>` named `hole` on the top face. The port's position + normal + up vector give a downstream assembly enough info to align a bolt to the hole."
 

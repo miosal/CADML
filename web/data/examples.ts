@@ -33,7 +33,7 @@ function bytesFromBase64(b64: string): Uint8Array {
   return out;
 }
 
-const COMPRESSOR_CADML = `version 0.2
+const COMPRESSOR_CADML = `version 0.3
 units mm
 
 import "compressor.lua"
@@ -197,7 +197,7 @@ end
 // (caster-wheel/{caster-wheel,fork,axle,wheel}.cadml) into one source
 // for the editor pane. STL export merges all parts into a single
 // triangle soup, so the rendered colour comes from the first <part>.
-const CASTER_WHEEL_CADML = `version 0.2
+const CASTER_WHEEL_CADML = `version 0.3
 units mm
 description "Caster-wheel assembly: a fork, an axle, and a wheel emitted as three top-level <part>s. The canonical example splits these into four files; the geometry is flattened here for a single-pane view."
 
@@ -290,7 +290,7 @@ param tread-d         = 38
 </part>
 `;
 
-const ENCLOSURE_CADML = `version 0.2
+const ENCLOSURE_CADML = `version 0.3
 units mm
 description "Tea-light holder exercising fillet, chamfer, shell, and revolve on one part. The base plate is a chamfered + filleted rectangle (bevel at the floor, rounded top rim). The candle cup is a hollow open-top cylinder built with <shell>. A collar revolved from a six-point ogee profile straddles the cup's top edge — the inner edge sits flush with the cup wall so the <union> melds into one continuous outer surface."
 

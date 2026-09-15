@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Hex nut, M8, modeled to ISO 4032 + ISO 68-1 (60° metric thread). 13 mm across-flats, 6.5 mm thick, with 30° chamfers on both faces (hex frustums modelled via <loft> between full and scaled hex sketches) and a sharp-V tapped internal thread that mates with the spec-correct hex-bolt example. Internal thread is a 60° V cutter swept along a helix at the bore wall, with its base flaring outward to the major diameter — same numerics as the bolt's external cutter, so the bolt's V-crests interlock cleanly with the nut's V-roots."
 

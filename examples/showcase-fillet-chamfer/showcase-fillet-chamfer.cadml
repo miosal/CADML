@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Six side-by-side blocks demonstrating the <fillet>, <chamfer>, and <shell> modifiers. Each block is the same 30×30×20 cuboid as the baseline (block 1); blocks 2–6 wrap it in one modifier element each."
 

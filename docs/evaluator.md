@@ -449,7 +449,7 @@ The input must be a single closed surface (`<extrude>` of a convex
 `open="end"` removes the end-cap. Both faces remain by default.
 
 The full selector grammar from spec §13 is deferred — only `start` and
-`end` are accepted in 0.2.
+`end` are accepted in 0.3.
 
 ### 8.4 `<cut>`
 

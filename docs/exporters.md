@@ -170,7 +170,7 @@ my-part.3mf  (ZIP archive)
 ### 2.3 What's deferred
 
 - **3MF Materials extension** (PBR, textures, finishing). Base colors
-  only in 0.2.
+  only in 0.3.
 - **3MF Production extension** (object UUIDs for replaceable parts).
 - **Per-triangle material assignment.** Would require splitting a
   part along its `face_groups` boundaries; not justified for the

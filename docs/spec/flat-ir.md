@@ -48,7 +48,7 @@ is identical to authoring CADML. The same parser produces a
 shape.
 
 ```
-version 0.2
+version 0.3
 units mm
 description "..."
 param shank-l = 50            ← surviving frontmatter params (immutable)

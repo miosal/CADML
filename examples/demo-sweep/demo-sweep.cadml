@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Examples of <sweep> + <helix>: a coil spring (sweep of a circle along a helix), a tapered spring, a helical thread cut into a cylindrical rod, and a triple-helix DNA-style structure. Each part exercises a different parameter combination."
 

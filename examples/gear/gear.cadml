@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Spur gear with involute tooth profile. The tooth shape is computed by gear.lua's involute_gear() — base / pitch / outer / root radii from the standard module-and-pressure-angle formulas, with each tooth's flank traced by points along the involute curve and joined to the next tooth via a tip arc and a root arc. The gear blank is centred on the X-Y plane (z = -face-width/2 .. +face-width/2) with a clearance bore through the middle."
 
