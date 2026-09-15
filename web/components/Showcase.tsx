@@ -16,12 +16,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { CadmlEditor }                              from './Editor';
 import { RevealSlider }                             from './RevealSlider';
-import { Viewport }                                 from './Viewport';
-import { EXAMPLES, entrySource, firstPartColor }   from '@/data/examples';
+import { Viewport, DEFAULT_PART_COLOR }             from './Viewport';
+import type { ViewPart }                            from './Viewport';
+import { EXAMPLES, entrySource }                    from '@/data/examples';
 import { loadCadml }                                from '@/lib/cadml';
-import type { CadmlModule }                         from '@/lib/cadml';
+import type { CadmlModule, ScenePart }              from '@/lib/cadml';
 import { parseBinarySTL }                           from '@/lib/stl';
-import type { ParsedSTL }                           from '@/lib/stl';
 import { errorsToMarkers, MarkerSeverity }          from '@/lib/cadml-diagnostics';
 import type { EditorMarker }                        from '@/lib/cadml-diagnostics';
 
@@ -29,6 +29,27 @@ const COMPILE_DEBOUNCE_MS = 300;
 // Don't show the loading overlay for compiles that finish quickly —
 // only after this much wall time does the suspense layer fade in.
 const OVERLAY_DELAY_MS    = 80;
+
+// Scene parts → viewport parts: parse each part's STL and decode its
+// texture image (spec 0.3) off the main thread via createImageBitmap,
+// so the viewport swap itself is synchronous and never shows a part
+// before its image is ready.
+async function buildViewParts(parts: ScenePart[]): Promise<ViewPart[]> {
+  return Promise.all(parts.map(async (p) => {
+    let texture: ViewPart['texture'] = null;
+    if (p.texture) {
+      const blob  = new Blob([p.texture.bytes as BlobPart], { type: p.texture.mime });
+      const image = await createImageBitmap(blob);
+      texture = { image, scale: p.texture.scale };
+    }
+    return {
+      name:    p.name,
+      mesh:    parseBinarySTL(p.stl),
+      color:   p.color || DEFAULT_PART_COLOR,
+      texture,
+    };
+  }));
+}
 
 export function Showcase() {
   const [exampleId, setExampleId] = useState(EXAMPLES[0].id);
@@ -39,7 +60,7 @@ export function Showcase() {
   // file list by swapping this in for the entry file's contents.
   const [source, setSource] = useState(() => entrySource(example));
 
-  const [mesh, setMesh]             = useState<ParsedSTL | null>(null);
+  const [parts, setParts]           = useState<ViewPart[] | null>(null);
   const [markers, setMarkers]       = useState<EditorMarker[]>([]);
   const [evaluating, setEvaluating] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -116,19 +137,14 @@ export function Showcase() {
         const files = example.files.map((f) =>
           f.path === example.entry ? { ...f, contents: source } : f,
         );
-        // Compile first to get status + diagnostics; only re-run
-        // the full pipeline (via exportStlFromProject) when the
-        // compile succeeded. This pays one extra compile on the
-        // success path — exportStlFromProject re-compiles internally
-        // — but keeps warnings surfaced as squiggles. The proper fix
-        // is a single WASM binding returning { stl, errors, warnings }
-        // so the document gets compiled once and reused for both.
-        const r = M.compileProject(files, example.entry);
+        // One compile + evaluation: per-part geometry, colour and
+        // texture, plus the diagnostics that become squiggles.
+        const r = M.sceneFromProject(files, example.entry);
         if (cancelled) return;
         if (r.ok) {
-          const stl = M.exportStlFromProject(files, example.entry);
+          const built = await buildViewParts(r.parts);
           if (cancelled) return;
-          if (stl) setMesh(parseBinarySTL(stl));
+          setParts(built);
           setMarkers(errorsToMarkers(r.warnings, MarkerSeverity.Warning, source));
         } else {
           setMarkers(errorsToMarkers(r.errors, MarkerSeverity.Error, source));
@@ -149,7 +165,6 @@ export function Showcase() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [source, example.id]);
 
-  const color = firstPartColor(source);
   // Desktop reveal-slider: editor is clipped to (percent)% of the card
   // width, exposing the 3D render beneath as the slider moves right.
   // Mobile uses a separate stacked layout below, no clip needed.
@@ -234,7 +249,7 @@ export function Showcase() {
         <div className="relative w-full aspect-[16/10] rounded-xl border border-zinc-200 bg-white overflow-hidden">
           {/* render layer (below) */}
           <div className="absolute inset-0 bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)]">
-            <Viewport mesh={mesh} color={color} xShift={0.15} cameraPhi={example.cameraPhi} />
+            <Viewport parts={parts} xShift={0.15} cameraPhi={example.cameraPhi} />
           </div>
           {suspenseOverlay}
           {/* editor layer (above, clipped) */}
@@ -255,7 +270,7 @@ export function Showcase() {
         <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
           {/* render (top) */}
           <div className="relative aspect-[4/3] bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)]">
-            <Viewport mesh={mesh} color={color} xShift={0} cameraPhi={example.cameraPhi} />
+            <Viewport parts={parts} xShift={0} cameraPhi={example.cameraPhi} />
             {suspenseOverlay}
             {evaluatingBadge}
           </div>

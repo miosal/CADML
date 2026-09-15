@@ -41,7 +41,7 @@ cmake --build build/wasm
 ```
 
 Output: `build/wasm/cadml.js` (~40 KB glue) + `build/wasm/cadml.wasm`
-(~905 KB, ~370 KB gzipped — what a browser actually downloads),
+(~960 KB, ~390 KB gzipped — what a browser actually downloads),
 size-optimized with `-Oz` + `-sFILESYSTEM=0`. (The native build lives in
 a sibling per-OS tree — `build/Windows`, `build/Linux`, `build/Darwin` —
 so the two never share a directory.)
@@ -59,7 +59,8 @@ cd wasm && node test_cadml_wasm.cjs   # expect ALL PASS
 
 Exercises the full pipeline: single-file compile → `.fcadml`, STL export
 (triangle-count + framing check), 3MF export (ZIP-magic check), the
-multi-file in-memory project path, and clean error reporting.
+multi-file in-memory project path, the per-part scene API with a
+binary texture file, and clean error reporting.
 
 ## JS API (embind)
 
@@ -77,6 +78,19 @@ const files = [ { path: 'lib.cadml', contents: '...' },
                 { path: 'main.cadml', contents: 'import "lib.cadml" ...' } ];
 const r    = M.compileProject(files, 'main.cadml');
 const stl2 = M.exportStlFromProject(files, 'main.cadml');
+
+// Scene: one compile + evaluation, surfaced per top-level <part> so a
+// viewer can colour and texture each part. A file's `contents` may be
+// a Uint8Array — that is how the PNG/JPEG a `<part texture="…">`
+// names (spec 0.3) gets in; the bundler inlines it.
+const scene = M.sceneFromProject(
+  [ ...files, { path: 'brick.png', contents: pngBytes } ], 'main.cadml');
+// { ok, errors, warnings,
+//   parts: [ { name, color, stl: Uint8Array,
+//              texture: null | { mime, bytes: Uint8Array, scale } } ] }
+// `scale` is the world-space size of one tile; CADML meshes carry no
+// UVs, so the consumer maps the image by projection (triplanar).
+const scene1 = M.sceneFromSource(srcString);   // single-file form
 ```
 
 ## Notes

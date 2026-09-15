@@ -1,7 +1,12 @@
-// Three.js viewport. Mounts a WebGLRenderer, holds one Mesh whose
-// geometry is swapped when `mesh` changes, and runs a simple orbit
-// camera driven by pointer events (mouse / touch / pen unified). No
-// external controls library — the math is short enough to inline.
+// Three.js viewport. Mounts a WebGLRenderer, holds one Mesh per CADML
+// part (swapped when `parts` changes), and runs a simple orbit camera
+// driven by pointer events (mouse / touch / pen unified). No external
+// controls library — the math is short enough to inline.
+//
+// Each part gets its own material so `<part color>` shows per part,
+// and a part with a spec-0.3 `texture` is shaded by triplanar
+// projection: CADML meshes carry no UVs, so the image is sampled along
+// the three world axes and blended by the surface normal.
 
 'use client';
 
@@ -9,9 +14,24 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { ParsedSTL } from '@/lib/stl';
 
-interface ViewportProps {
-  mesh:    ParsedSTL | null;
+export interface ViewTexture {
+  // Decoded image (the caller awaits createImageBitmap so the swap
+  // here stays synchronous and never renders a half-loaded frame).
+  image: ImageBitmap;
+  // World-space size of one tile, document units.
+  scale: number;
+}
+
+export interface ViewPart {
+  name:    string;
+  mesh:    ParsedSTL;
+  // '#rrggbb'; the caller substitutes the default when a part has none.
   color:   string;
+  texture: ViewTexture | null;
+}
+
+interface ViewportProps {
+  parts:   ViewPart[] | null;
   // 0..0.5: mesh appears xShift * canvasWidth pixels right of canvas
   // centre. Implemented by shifting both camera position and lookAt
   // target laterally in the camera's horizontal plane, so the mesh
@@ -24,19 +44,18 @@ interface ViewportProps {
 }
 
 interface ViewportState {
-  renderer:     THREE.WebGLRenderer;
-  scene:        THREE.Scene;
-  camera:       THREE.PerspectiveCamera;
-  material:     THREE.MeshStandardMaterial;
-  edgeMaterial: THREE.LineBasicMaterial;
-  object:       THREE.Mesh | null;
-  edges:        THREE.LineSegments | null;
-  target:       THREE.Vector3;
-  radius:       number;
-  theta:        number;
-  phi:          number;
-  xShift:       number;
-  autoRotate:   boolean;
+  renderer:   THREE.WebGLRenderer;
+  scene:      THREE.Scene;
+  camera:     THREE.PerspectiveCamera;
+  // Everything belonging to the current parts: meshes, edge overlays,
+  // and their materials / textures. Disposed wholesale on swap.
+  group:      THREE.Group | null;
+  target:     THREE.Vector3;
+  radius:     number;
+  theta:      number;
+  phi:        number;
+  xShift:     number;
+  autoRotate: boolean;
 }
 
 // Radians per animation frame for the idle spin (~17°/s @ 60fps).
@@ -52,7 +71,96 @@ const DEFAULT_THETA = 0.9;
 // surface is treated as continuous, above it as a hard edge.
 const EDGE_THRESHOLD_DEG = 25;
 
-export function Viewport({ mesh, color, xShift = 0, cameraPhi }: ViewportProps) {
+// Body colour for a part that declares none.
+export const DEFAULT_PART_COLOR = '#9090a0';
+
+// Shared surface look. Push the shaded mesh back by one depth unit so
+// the edge overlay renders in front without z-fighting.
+const SURFACE: THREE.MeshStandardMaterialParameters = {
+  metalness:           0.15,
+  roughness:           0.6,
+  polygonOffset:       true,
+  polygonOffsetFactor: 1,
+  polygonOffsetUnits:  1,
+};
+
+// Triplanar shading grafted onto MeshStandardMaterial: the texture
+// replaces the base colour (a textured part's `color` is not applied),
+// and every other lighting term is three.js's own. Positions are in
+// mesh space, which is document space — the meshes carry no transform.
+const TRIPLANAR_VERT_DECL = /* glsl */ `
+#include <common>
+varying vec3 vTriPos;
+varying vec3 vTriNrm;`;
+const TRIPLANAR_VERT_BODY = /* glsl */ `
+#include <begin_vertex>
+vTriPos = position;
+vTriNrm = normal;`;
+const TRIPLANAR_FRAG_DECL = /* glsl */ `
+#include <common>
+uniform sampler2D uTriTex;
+uniform float     uTriScale;
+varying vec3 vTriPos;
+varying vec3 vTriNrm;`;
+const TRIPLANAR_FRAG_BODY = /* glsl */ `
+#include <map_fragment>
+{
+  vec3 w = abs(normalize(vTriNrm));
+  w = w * w * w * w;
+  w /= (w.x + w.y + w.z);
+  vec3 p = vTriPos / uTriScale;
+  vec4 tx = texture2D(uTriTex, p.yz);
+  vec4 ty = texture2D(uTriTex, p.xz);
+  vec4 tz = texture2D(uTriTex, p.xy);
+  diffuseColor = tx * w.x + ty * w.y + tz * w.z;
+}`;
+
+function makeTexture(t: ViewTexture): THREE.Texture {
+  const tex = new THREE.Texture(t.image);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function makeMaterial(part: ViewPart): THREE.MeshStandardMaterial {
+  if (!part.texture) {
+    return new THREE.MeshStandardMaterial({ ...SURFACE, color: part.color });
+  }
+  const tex   = makeTexture(part.texture);
+  const scale = part.texture.scale;
+  const m = new THREE.MeshStandardMaterial({ ...SURFACE, color: 0xffffff });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uTriTex   = { value: tex };
+    shader.uniforms.uTriScale = { value: scale };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>',       TRIPLANAR_VERT_DECL)
+      .replace('#include <begin_vertex>', TRIPLANAR_VERT_BODY);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>',       TRIPLANAR_FRAG_DECL)
+      .replace('#include <map_fragment>', TRIPLANAR_FRAG_BODY);
+  };
+  // Distinguish the patched program from the stock one in three's cache.
+  m.customProgramCacheKey = () => 'cadml-triplanar';
+  // Keep the texture reachable for disposal alongside the material.
+  m.userData.texture = tex;
+  return m;
+}
+
+function disposeGroup(group: THREE.Group) {
+  group.traverse((obj) => {
+    if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
+      (obj.geometry as THREE.BufferGeometry).dispose();
+      const mat = obj.material as THREE.Material;
+      const tex = mat.userData?.texture as THREE.Texture | undefined;
+      if (tex) tex.dispose();
+      mat.dispose();
+    }
+  });
+}
+
+export function Viewport({ parts, xShift = 0, cameraPhi }: ViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stateRef     = useRef<ViewportState | null>(null);
 
@@ -97,26 +205,10 @@ export function Viewport({ mesh, color, xShift = 0, cameraPhi }: ViewportProps) 
     scene.add(rim);
 
     const camera = new THREE.PerspectiveCamera(38, w0 / h0, 0.1, 10000);
-    // Push the shaded mesh back by one depth unit so the edge overlay
-    // renders in front without z-fighting.
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x9090a0,
-      metalness: 0.15,
-      roughness: 0.6,
-      polygonOffset:       true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits:  1,
-    });
-    const edgeMaterial = new THREE.LineBasicMaterial({
-      color:       0x202028,
-      transparent: true,
-      opacity:     0.6,
-    });
 
     const state: ViewportState = {
-      renderer, scene, camera, material, edgeMaterial,
-      object: null,
-      edges:  null,
+      renderer, scene, camera,
+      group:  null,
       target: new THREE.Vector3(),
       radius: 80, theta: DEFAULT_THETA, phi: DEFAULT_PHI,
       xShift,
@@ -218,69 +310,77 @@ export function Viewport({ mesh, color, xShift = 0, cameraPhi }: ViewportProps) 
       el.removeEventListener('pointerup',     onUp);
       el.removeEventListener('pointercancel', onUp);
       el.removeEventListener('wheel',         onWheel);
-      if (state.object) {
-        scene.remove(state.object);
-        state.object.geometry.dispose();
+      if (state.group) {
+        scene.remove(state.group);
+        disposeGroup(state.group);
       }
-      if (state.edges) {
-        scene.remove(state.edges);
-        (state.edges.geometry as THREE.BufferGeometry).dispose();
-      }
-      material.dispose();
-      edgeMaterial.dispose();
       renderer.dispose();
       el.remove();
       if (stateRef.current === state) stateRef.current = null;
     };
   }, []);
 
-  // Mesh swap + camera fit. Each new example resets the idle spin so
+  // Parts swap + camera fit. Each new example resets the idle spin so
   // a freshly-loaded model rotates until the user clicks it.
   useEffect(() => {
     const s = stateRef.current;
     if (!s) return;
-    if (s.object) {
-      s.scene.remove(s.object);
-      s.object.geometry.dispose();
-      s.object = null;
+    if (s.group) {
+      s.scene.remove(s.group);
+      disposeGroup(s.group);
+      s.group = null;
     }
-    if (s.edges) {
-      s.scene.remove(s.edges);
-      (s.edges.geometry as THREE.BufferGeometry).dispose();
-      s.edges = null;
+    if (!parts || parts.length === 0) return;
+
+    const group = new THREE.Group();
+    const bounds = new THREE.Box3();
+    const geometries: THREE.BufferGeometry[] = [];
+    for (const part of parts) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(part.mesh.positions, 3));
+      g.setAttribute('normal',   new THREE.BufferAttribute(part.mesh.normals,   3));
+      g.computeBoundingBox();
+      if (g.boundingBox) bounds.union(g.boundingBox);
+      geometries.push(g);
+
+      const material = makeMaterial(part);
+      group.add(new THREE.Mesh(g, material));
+
+      // Edge colour follows the body at 25% brightness so edges stay
+      // visible without competing with the body fill.
+      const edgeMaterial = new THREE.LineBasicMaterial({
+        color:       new THREE.Color(part.color).multiplyScalar(0.25),
+        transparent: true,
+        opacity:     0.6,
+      });
+      group.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(g, EDGE_THRESHOLD_DEG), edgeMaterial));
     }
-    if (!mesh) return;
+    s.group = group;
+    s.scene.add(group);
 
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
-    g.setAttribute('normal',   new THREE.BufferAttribute(mesh.normals,   3));
-    g.computeBoundingSphere();
-    s.object = new THREE.Mesh(g, s.material);
-    s.scene.add(s.object);
-
-    const edgesGeom = new THREE.EdgesGeometry(g, EDGE_THRESHOLD_DEG);
-    s.edges = new THREE.LineSegments(edgesGeom, s.edgeMaterial);
-    s.scene.add(s.edges);
-
-    if (g.boundingSphere) {
-      s.target.copy(g.boundingSphere.center);
+    // Fit: sphere about the union box's centre, radius from the
+    // farthest vertex (tighter than the box's half-diagonal).
+    if (!bounds.isEmpty()) {
+      const center = bounds.getCenter(new THREE.Vector3());
+      let r2 = 0;
+      const v = new THREE.Vector3();
+      for (const g of geometries) {
+        const pos = g.getAttribute('position');
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          r2 = Math.max(r2, v.distanceToSquared(center));
+        }
+      }
+      s.target.copy(center);
       s.radius =
-        g.boundingSphere.radius /
+        Math.sqrt(r2) /
         Math.sin((s.camera.fov * Math.PI) / 360) * 1.35;
     }
     s.theta = DEFAULT_THETA;
     s.phi   = cameraPhi ?? DEFAULT_PHI;
     s.autoRotate = true;
-  }, [mesh, cameraPhi]);
-
-  // Colour swap. Edge colour follows the body at 25% brightness so
-  // edges stay visible without competing with the body fill.
-  useEffect(() => {
-    const s = stateRef.current;
-    if (!s) return;
-    s.material.color.set(color);
-    s.edgeMaterial.color.copy(s.material.color).multiplyScalar(0.25);
-  }, [color]);
+  }, [parts, cameraPhi]);
 
   // xShift live-updates without rebuilding the renderer.
   useEffect(() => {

@@ -10,7 +10,9 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -88,6 +90,27 @@ val export3mfFromSource(const std::string& source) {
 // entry within it. Imports resolve by lookup in the array — exactly the
 // path a real WASM host (browser editor, playground) uses.
 
+// A file's `contents` is a JS string (source text) or a Uint8Array
+// (binary assets such as the PNG/JPEG a `<part texture="…">` names —
+// spec 0.3). Bytes are copied into a std::string, which is what the
+// in-memory provider hands the bundler for `texture-data` inlining.
+std::string marshal_contents(const val& contents) {
+    if (contents.isString()) return contents.as<std::string>();
+    if (contents.instanceof(val::global("Uint8Array"))) {
+        const std::size_t n = contents["length"].as<std::size_t>();
+        std::string bytes(n, '\0');
+        if (n > 0) {
+            val view = val(typed_memory_view(
+                n, reinterpret_cast<std::uint8_t*>(bytes.data())));
+            view.call<void>("set", contents);
+        }
+        return bytes;
+    }
+    // Anything else (undefined, null, a number) is a caller bug; an
+    // empty file makes the bundler report it rather than trapping here.
+    return {};
+}
+
 std::vector<cadml::compile::InMemoryFile> marshal_files(const val& jsFiles) {
     std::vector<cadml::compile::InMemoryFile> files;
     const unsigned n = jsFiles["length"].as<unsigned>();
@@ -95,7 +118,7 @@ std::vector<cadml::compile::InMemoryFile> marshal_files(const val& jsFiles) {
     for (unsigned i = 0; i < n; ++i) {
         const val f = jsFiles[i];
         files.push_back({ f["path"].as<std::string>(),
-                          f["contents"].as<std::string>() });
+                          marshal_contents(f["contents"]) });
     }
     return files;
 }
@@ -114,6 +137,86 @@ val exportStlFromProject(const val& jsFiles, const std::string& entry) {
     return to_uint8array(os.str());
 }
 
+// ── Scene API ─────────────────────────────────────────────────────────
+//
+// One compile + one evaluation, surfaced per part so a renderer can
+// give each top-level <part> its own colour and (spec 0.3) texture:
+//
+//   { ok, errors, warnings,
+//     parts: [ { name, color, stl: Uint8Array,
+//                texture: null | { mime, bytes: Uint8Array, scale } } ] }
+//
+// `stl` is that part alone, as a binary STL. `texture.bytes` is the
+// image file as-is (PNG or JPEG); `scale` is the resolved world-space
+// size of one tile — CADML meshes carry no UVs, so the consumer maps
+// the image by projection (triplanar in the reference viewers). On a
+// compile or evaluation failure `ok` is false, `errors` says why and
+// `parts` is empty; warnings are reported either way.
+
+std::string join_eval(const std::vector<cadml::engine::FlatEvalError>& v) {
+    std::string s;
+    for (const auto& e : v) {
+        if (!s.empty()) s += '\n';
+        s += e.message;
+    }
+    return s;
+}
+
+val scene_of(const cadml::compile::CompileResult& cr) {
+    val out = val::object();
+    val parts = val::array();
+    std::string warnings = join(cr.warnings);
+    if (!cr.ok()) {
+        out.set("ok", false);
+        out.set("errors", join(cr.errors));
+        out.set("warnings", warnings);
+        out.set("parts", parts);
+        return out;
+    }
+    auto er = cadml::engine::evaluate_flat(cr.document);
+    {
+        const std::string w = join_eval(er.warnings);
+        if (!w.empty()) warnings += (warnings.empty() ? "" : "\n") + w;
+    }
+    out.set("ok", er.ok());
+    out.set("errors", join_eval(er.errors));
+    out.set("warnings", warnings);
+    if (er.ok()) {
+        for (auto& part : er.parts) {
+            val jp = val::object();
+            jp.set("name", part.name);
+            jp.set("color", part.color);
+            if (part.texture) {
+                val jt = val::object();
+                jt.set("mime",  part.texture->mime);
+                jt.set("bytes", to_uint8array(part.texture->bytes));
+                jt.set("scale", part.texture->scale);
+                jp.set("texture", jt);
+            } else {
+                jp.set("texture", val::null());
+            }
+            // write_stl_binary takes a whole result; give it this part
+            // alone (moved, not copied — `er` is not used afterwards).
+            cadml::engine::FlatEvalResult single;
+            single.parts.push_back(std::move(part));
+            std::ostringstream os;
+            cadml::engine::write_stl_binary(single, os);
+            jp.set("stl", to_uint8array(os.str()));
+            parts.call<void>("push", jp);
+        }
+    }
+    out.set("parts", parts);
+    return out;
+}
+
+val sceneFromSource(const std::string& source) {
+    return scene_of(cadml::compile::compile_string(source));
+}
+
+val sceneFromProject(const val& jsFiles, const std::string& entry) {
+    return scene_of(cadml::compile::compile_in_memory(marshal_files(jsFiles), entry));
+}
+
 }  // namespace
 
 EMSCRIPTEN_BINDINGS(cadml) {
@@ -128,4 +231,6 @@ EMSCRIPTEN_BINDINGS(cadml) {
     function("export3mfFromSource",  &export3mfFromSource);
     function("compileProject",       &compileProject);
     function("exportStlFromProject", &exportStlFromProject);
+    function("sceneFromSource",      &sceneFromSource);
+    function("sceneFromProject",     &sceneFromProject);
 }
