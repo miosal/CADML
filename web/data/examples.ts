@@ -481,7 +481,7 @@ export const EXAMPLES: Example[] = [
   {
     id:    'planter',
     title: 'Planter',
-    blurb: 'Brick ring, timber coping and a lawn — three plain bodies with brick and grass image textures attached through the 0.3 <part texture> attribute.',
+    blurb: 'Brick ring, timber coping and a lawn: three plain bodies with brick and grass image textures attached through the 0.3 <part texture> attribute.',
     files: [
       { path: 'planter.cadml', contents: PLANTER_CADML },
       { path: 'brick.png',     contents: BRICK_PNG     },
