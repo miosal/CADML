@@ -481,7 +481,7 @@ export const EXAMPLES: Example[] = [
   {
     id:    'planter',
     title: 'Planter',
-    blurb: 'Brick ring, timber coping and a lawn — three plain bodies with spec-0.3 <part texture> images. No UVs are modelled: the viewer projects each tile onto the surface (triplanar), at the size the source gives with texture-scale.',
+    blurb: 'Brick ring, timber coping and a lawn — three plain bodies with brick and grass image textures attached through the 0.3 <part texture> attribute.',
     files: [
       { path: 'planter.cadml', contents: PLANTER_CADML },
       { path: 'brick.png',     contents: BRICK_PNG     },
