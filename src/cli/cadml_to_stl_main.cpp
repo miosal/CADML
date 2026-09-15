@@ -13,6 +13,7 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -28,6 +29,8 @@ void print_usage(std::ostream& os) {
         "Options:\n"
         "  -o <path>          STL output path (required)\n"
         "  --header <text>    80-byte STL header tag (default \"CADML\")\n"
+        "  -p, --part NAME    Export only the named top-level part\n"
+        "                     (repeatable; default: every part, merged)\n"
         "  -h, --help         Show this help\n";
 }
 
@@ -38,6 +41,7 @@ int main(int argc, char** argv) {
     fs::path entry;
     fs::path output;
     std::string header = "CADML";
+    std::vector<std::string> only_parts;
 
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
@@ -51,6 +55,14 @@ int main(int argc, char** argv) {
                 return 2;
             }
             output = argv[++i];
+            continue;
+        }
+        if (arg == "-p" || arg == "--part") {
+            if (i + 1 >= argc) {
+                std::cerr << "error: --part requires an argument\n";
+                return 2;
+            }
+            only_parts.emplace_back(argv[++i]);
             continue;
         }
         if (arg == "--header") {
@@ -92,6 +104,26 @@ int main(int argc, char** argv) {
     for (const auto& e : er.errors)
         std::fprintf(stderr, "error: %s\n", e.message.c_str());
     if (!er.ok()) return 1;
+
+    if (!only_parts.empty()) {
+        // Keep only the requested parts, in document order. An unknown
+        // name is an error (a typo would otherwise silently export nothing).
+        std::vector<cadml::engine::FlatEvalResult::Part> kept;
+        for (auto& p : er.parts) {
+            for (const auto& want : only_parts) {
+                if (p.name == want) { kept.push_back(std::move(p)); break; }
+            }
+        }
+        for (const auto& want : only_parts) {
+            bool found = false;
+            for (const auto& p : kept) if (p.name == want) found = true;
+            if (!found) {
+                std::fprintf(stderr, "error: no part named `%s`\n", want.c_str());
+                return 1;
+            }
+        }
+        er.parts = std::move(kept);
+    }
 
     if (er.parts.empty()) {
         std::fprintf(stderr,
