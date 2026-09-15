@@ -16,6 +16,7 @@
 #include "unrollers.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -358,7 +359,8 @@ void merge_imported_doc(Document& host, Document imported,
             const auto& pa = std::get<PartAttrs>(imported.nodes[idx].attrs);
             DefAttrs da;
             da.name  = prefix;
-            da.color = pa.color;   // preserve imported part colour
+            da.color   = pa.color;     // preserve imported part colour
+            da.texture = pa.texture;   // …and its texture (spec 0.3)
             imported.nodes[idx].type = NodeType::Def;
             imported.nodes[idx].attrs = da;
         } else if (imported.nodes[idx].type == NodeType::Assembly) {
@@ -760,6 +762,37 @@ std::int64_t resolve_instance_ref(const Document& doc,
     return -1;
 }
 
+// ─── texture="…" helpers (spec 0.3) ──────────────────────────────────
+
+// MIME type for a texture path by extension (case-insensitive). Only
+// the two image formats every consumer can decode (and glTF core
+// mandates) are accepted in 0.3.
+std::string texture_mime_from_path(std::string_view path) {
+    const auto dot = path.rfind('.');
+    if (dot == std::string_view::npos) return {};
+    std::string ext(path.substr(dot + 1));
+    for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (ext == "png")                  return "image/png";
+    if (ext == "jpg" || ext == "jpeg") return "image/jpeg";
+    return {};
+}
+
+bool is_supported_texture_mime(std::string_view mime) {
+    return mime == "image/png" || mime == "image/jpeg";
+}
+
+// Mutable access to the TextureAttrs of a <part>/<def>, nullptr for any
+// other node type.
+TextureAttrs* texture_attrs_of(Node& n) {
+    if (n.dead) return nullptr;
+    if (n.type == NodeType::Part) return &std::get<PartAttrs>(n.attrs).texture;
+    if (n.type == NodeType::Def)  return &std::get<DefAttrs>(n.attrs).texture;
+    return nullptr;
+}
+const TextureAttrs* texture_attrs_of(const Node& n) {
+    return texture_attrs_of(const_cast<Node&>(n));
+}
+
 // §15.2/§15.3 coherence of the MERGED document: the flat output declares
 // the ENTRY file's spec version, so every def name and instance
 // reference in it must mean the same thing when re-parsed under that
@@ -786,6 +819,21 @@ void check_entry_spec_vocabulary(const Document& doc,
     for (std::uint32_t ni = 0; ni < doc.nodes.size(); ++ni) {
         const auto& n = doc.nodes[ni];
         if (n.dead) continue;
+        // `texture*` attributes are spec 0.3 vocabulary (§5.1). Under an
+        // older declared version they were unknown attributes the parser
+        // ignored; now that they mean something, a pre-0.3 document
+        // using them is a stale `version` declaration — same treatment
+        // as `<stl>` in a 0.1 file below.
+        if (const TextureAttrs* t = texture_attrs_of(n);
+            t && entry_spec < kSpecV03 &&
+            (!t->empty() || !t->type.empty() || !t->scale_expr.empty())) {
+            errors.push_back({ CompileError::Vocabulary,
+                "`texture` attributes are available since spec version " +
+                to_string(kSpecV03) + ", but this document declares"
+                " `version " + doc.meta.version + "`; bump the `version`"
+                " declaration to use them",
+                n.source });
+        }
         if (n.type == NodeType::Def) {
             const auto& da = std::get<DefAttrs>(n.attrs);
             if (node_type_from_builtin_name(da.name, entry_spec)
@@ -1039,6 +1087,89 @@ void resolve_stl_imports(Document& doc, const P& provider,
     }
 }
 
+// ─── texture="…" image inlining (spec 0.3) ───────────────────────────
+//
+// `<part texture="grass.png">` / `<def texture="…">` are lowered to the
+// self-contained `texture-data` + `texture-type` form the engine reads,
+// exactly as `<stl src>` is lowered to `data`: paths resolve relative to
+// the authoring file, reuse the import containment guards, and the
+// image bytes are base64-embedded so the flat document carries no
+// external asset references.
+
+template <SourceProvider P>
+void resolve_texture_refs(Document& doc, const P& provider,
+                           const std::vector<SourceFile>& source_files,
+                           std::vector<CompileError>& errors) {
+    // A pre-0.3 document cannot carry textures; leave `src` in place so
+    // check_entry_spec_vocabulary reports the version to bump instead
+    // of an unrelated read error.
+    if (spec_version_from_string(doc.meta.version) < kSpecV03) return;
+
+    std::unordered_map<std::string, std::string> encoded_by_key;
+
+    for (auto& n : doc.nodes) {
+        TextureAttrs* t = texture_attrs_of(n);
+        if (!t || !t->data.empty() || t->src.empty()) continue;
+
+        auto fail = [&](std::string msg) {
+            errors.push_back({ CompileError::Import, std::move(msg), n.source });
+        };
+
+        // SECURITY: reject absolute paths outright, exactly as imports do.
+        if (fs::path(t->src).is_absolute() ||
+            t->src.front() == '/' || t->src.front() == '\\') {
+            fail("texture: absolute paths are not permitted (`" + t->src +
+                 "`); use a path relative to the document");
+            continue;
+        }
+
+        const std::string mime = texture_mime_from_path(t->src);
+        if (mime.empty()) {
+            fail("texture: `" + t->src + "` is not a supported image format"
+                 " (use a .png or .jpg/.jpeg file)");
+            continue;
+        }
+
+        std::string dir;
+        if (n.source.file != NO_FILE && n.source.file < source_files.size()) {
+            dir = dir_key_of(source_files[n.source.file].path);
+        }
+        const std::string key = resolve_import_key(t->src, dir);
+        if (key_escapes_root(key)) {
+            fail("texture: `" + t->src + "` resolves outside the project root");
+            continue;
+        }
+
+        if (const auto it = encoded_by_key.find(key);
+            it != encoded_by_key.end()) {
+            t->data = it->second;
+            t->type = mime;
+            t->src.clear();
+            continue;
+        }
+
+        const ReadResult rr = provider.read(key);
+        if (!rr.contents) {
+            fail(rr.too_large
+                     ? "texture: `" + t->src + "` exceeds the " +
+                           std::to_string(cadml::kMaxTextureBytes) +
+                           "-byte size limit"
+                     : "texture: cannot find referenced file `" + t->src + "`");
+            continue;
+        }
+        if (rr.contents->size() > cadml::kMaxTextureBytes) {
+            fail("texture: `" + t->src + "` exceeds the " +
+                 std::to_string(cadml::kMaxTextureBytes) + "-byte size limit");
+            continue;
+        }
+
+        t->data = base64_encode(*rr.contents);
+        t->type = mime;
+        t->src.clear();
+        encoded_by_key.emplace(key, t->data);
+    }
+}
+
 // All composition constructs (<for>, <pattern>, <assembly>, <connect>,
 // mating instances) are now lowered by the bundler. Any remaining
 // instance with at/port outside an assembly context is an error.
@@ -1139,6 +1270,35 @@ void check_unsupported_constructs(const Document& doc,
                              " base64 STL)";
                 e.source = n.source;
                 errors.push_back(std::move(e));
+            }
+        }
+        // texture="…" (spec 0.3 §5.1): the image comes from exactly one
+        // source, and an embedded image must say what it is. Checked
+        // after resolve_texture_refs, so a lowered `texture=` (now
+        // `texture-data` + `texture-type`) passes clean.
+        if (const TextureAttrs* t = texture_attrs_of(n)) {
+            auto schema = [&](std::string msg) {
+                CompileError e;
+                e.category = CompileError::Schema;
+                e.message  = std::move(msg);
+                e.source   = n.source;
+                errors.push_back(std::move(e));
+            };
+            const bool has_src  = !t->src.empty();
+            const bool has_data = !t->data.empty();
+            if (has_src && has_data) {
+                schema("`texture` and `texture-data` are both set; the image"
+                       " comes from exactly one source — remove one");
+            } else if (has_data && t->type.empty()) {
+                schema("`texture-data` needs a `texture-type` (\"image/png\""
+                       " or \"image/jpeg\") so consumers can decode it");
+            } else if (!t->type.empty() && !is_supported_texture_mime(t->type)) {
+                schema("`texture-type=\"" + t->type + "\"` is not supported;"
+                       " use \"image/png\" or \"image/jpeg\"");
+            } else if (t->empty() && (!t->type.empty() || !t->scale_expr.empty())) {
+                schema("`texture-type` / `texture-scale` without a texture"
+                       " image; set `texture` (a relative .png/.jpg path) or"
+                       " `texture-data` (embedded base64 image)");
             }
         }
     }
@@ -1481,6 +1641,8 @@ CompileResult compile_string(std::string_view source,
         for (auto& w : ctx.warnings) result.warnings.push_back(std::move(w));
         resolve_stl_imports(result.document, provider,
                              result.document.source_files, result.errors);
+        resolve_texture_refs(result.document, provider,
+                              result.document.source_files, result.errors);
     } else if (!result.document.imports.empty()) {
         // Single-file mode: imports declared but nowhere to resolve them.
         CompileError e;
@@ -1505,6 +1667,20 @@ CompileResult compile_string(std::string_view source,
                          " — no base directory supplied; use compile_file,"
                          " compile_in_memory, or pass base_dir (or embed"
                          " the mesh as base64 `data`)";
+            e.source = n.source;
+            result.errors.push_back(std::move(e));
+        }
+        for (const auto& n : result.document.nodes) {
+            const TextureAttrs* t = texture_attrs_of(n);
+            if (!t || t->src.empty() || !t->data.empty()) continue;
+            if (spec_version_from_string(result.document.meta.version)
+                    < kSpecV03) continue;   // the spec gate reports this one
+            CompileError e;
+            e.category = CompileError::Import;
+            e.message  = "texture: `texture=\"" + t->src + "\"` cannot be"
+                         " resolved — no base directory supplied; use"
+                         " compile_file, compile_in_memory, or pass base_dir"
+                         " (or embed the image as base64 `texture-data`)";
             e.source = n.source;
             result.errors.push_back(std::move(e));
         }
@@ -1557,6 +1733,8 @@ CompileResult compile_in_memory(const std::vector<InMemoryFile>& files,
     for (auto& w : ctx.warnings) result.warnings.push_back(std::move(w));
     resolve_stl_imports(result.document, provider,
                          result.document.source_files, result.errors);
+    resolve_texture_refs(result.document, provider,
+                          result.document.source_files, result.errors);
 
     run_lowering(result, opts);
     return result;

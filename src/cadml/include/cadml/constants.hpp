@@ -51,6 +51,11 @@ inline constexpr int         kSweepSegmentsPerTurn  = 32;
 // untrusted CADML sources.
 
 inline constexpr std::size_t kMaxSourceBytes      = 64ull * 1024 * 1024;
+// Cap on one texture image referenced by `texture="…"` (spec 0.3). The
+// bundler embeds the file as base64 in the flat document, so an
+// oversize image would bloat every consumer; 16 MiB is generous for a
+// tiling surface texture (a 4096² PNG is typically well under that).
+inline constexpr std::size_t kMaxTextureBytes     = 16ull * 1024 * 1024;
 inline constexpr int         kMaxXmlDepth         = 256;
 inline constexpr int         kMaxExpressionDepth  = 256;
 inline constexpr int         kMaxForSteps         = 100000;

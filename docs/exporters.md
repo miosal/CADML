@@ -301,6 +301,14 @@ CADML colors are sRGB, the RGB channels are converted sRGB→linear on
 export (alpha passes through). A part with no color, or a color that
 doesn't resolve, gets no material and renders with the viewer's default.
 
+Textures (`<part texture="…">`, spec 0.3) are **not yet exported** by
+any writer: glTF would need `images` / `samplers` / `textures` arrays
+plus a `TEXCOORD_0` accessor that the engine does not produce (CADML
+meshes have no UVs — consumers apply textures by triplanar projection,
+see spec §5.1). A part's texture is available to host applications
+through `FlatEvalResult::Part::texture`; a glTF export with generated
+box-projection UVs is a candidate follow-up.
+
 ### 4.5 Source attribution in `extras`
 
 Each glTF node carries `extras` with the source location:

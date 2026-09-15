@@ -302,3 +302,51 @@ TEST(Serializer, StlEmbeddedDataRoundTrips) {
     EXPECT_EQ(a.encoding, "base64");
     EXPECT_TRUE(a.src.empty());
 }
+
+// ─── texture attributes (spec 0.3) ───────────────────────────────────
+
+TEST(Serializer, PartTextureAuthoringFormRoundTrips) {
+    auto rt = round_trip(
+        "version 0.3\n"
+        "<part name=\"wall\" texture=\"brick.png\" texture-scale=\"{w / 2}\">\n"
+        "  <extrude height=\"1\"><rect width=\"2\" height=\"2\"/></extrude>\n"
+        "</part>\n");
+    expect_node_count(rt.a, rt.b);
+    ASSERT_EQ(rt.b.nodes[0].type, NodeType::Part);
+    const auto& p = std::get<PartAttrs>(rt.b.nodes[0].attrs);
+    EXPECT_EQ(p.texture.src, "brick.png");
+    EXPECT_EQ(p.texture.scale_expr, "{w / 2}");
+    EXPECT_TRUE(p.texture.data.empty());
+}
+
+TEST(Serializer, PartTextureEmbeddedFormRoundTrips) {
+    auto rt = round_trip(
+        "version 0.3\n"
+        "<part texture-data=\"QUJDRA==\" texture-type=\"image/png\"/>\n");
+    const auto& p = std::get<PartAttrs>(rt.b.nodes[0].attrs);
+    EXPECT_EQ(p.texture.data, "QUJDRA==");
+    EXPECT_EQ(p.texture.type, "image/png");
+    EXPECT_TRUE(p.texture.src.empty());
+}
+
+TEST(Serializer, DefTextureRoundTrips) {
+    auto rt = round_trip(
+        "version 0.3\n"
+        "<def name=\"plank\" texture-data=\"QUJDRA==\" texture-type=\"image/jpeg\""
+        " texture-scale=\"40\"><circle r=\"1\"/></def>\n"
+        "<part name=\"p\"><plank/></part>\n");
+    expect_node_count(rt.a, rt.b);
+    const auto& d = std::get<DefAttrs>(rt.b.nodes[0].attrs);
+    EXPECT_EQ(d.texture.data, "QUJDRA==");
+    EXPECT_EQ(d.texture.type, "image/jpeg");
+    EXPECT_EQ(d.texture.scale_expr, "40");
+}
+
+TEST(Serializer, UntexturedPartEmitsNoTextureAttributes) {
+    // Pre-0.3 output must be byte-identical for documents that don't
+    // use the feature.
+    auto p = parse("version 0.2\n<part name=\"p\" color=\"red\"/>\n");
+    ASSERT_TRUE(p.ok());
+    auto s = serialize(p.document);
+    EXPECT_EQ(s.find("texture"), std::string::npos) << s;
+}

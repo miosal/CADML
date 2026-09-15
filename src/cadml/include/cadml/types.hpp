@@ -192,11 +192,12 @@ std::string to_string(SpecVersion v);
 
 inline constexpr SpecVersion kSpecV01{0, 1};
 inline constexpr SpecVersion kSpecV02{0, 2};
+inline constexpr SpecVersion kSpecV03{0, 3};
 
 // The newest spec version this implementation knows. Every version-gated
 // surface (reserved-name sets, the compiler's version acceptance check)
 // derives from the `since` column of the built-in table and this value.
-inline constexpr SpecVersion kSpecLatest = kSpecV02;
+inline constexpr SpecVersion kSpecLatest = kSpecV03;
 
 // Parse the leading "major.minor" of a `version` declaration (accepts
 // the normalised "0.2.0" form DocumentMeta stores as well as a bare
@@ -243,9 +244,45 @@ bool is_builtin(NodeType type);
 
 // Structural ─────────────────────────────────────────────────────────────
 
+// Surface texture reference (spec 0.3, §5.1). An image the renderer
+// maps onto every face of the part — the mesh-side counterpart of
+// `color`. Exactly one image source is expected when a texture is set:
+//   * `src`  — `texture="grass.png"`: a path to a PNG/JPEG file, resolved
+//              relative to the document exactly like `<stl src>` and
+//              imports (the authoring form). The bundler reads the file
+//              and lowers it to `data` so the flat document stays
+//              self-contained and the engine never touches the
+//              filesystem.
+//   * `data` — `texture-data="…"`: the image bytes embedded as base64
+//              (the flat / single-file form). `type` (`texture-type`) is
+//              the image MIME type — `image/png` or `image/jpeg` — derived
+//              from the file extension when the bundler lowers `src`, and
+//              required when `data` is hand-authored.
+// `scale_expr` (`texture-scale`) is the size, in document units, of one
+// texture tile on the surface (a numeric expression). Empty means "let
+// the engine pick": the evaluator defaults it to the part's largest
+// bounding-box extent, so a texture tiles once across the part.
+//
+// CADML meshes carry no UV coordinates — CSG output has no natural
+// parameterisation — so a texture is applied by the *renderer* with a
+// projection that needs only world position + normal (triplanar
+// mapping in the reference consumers). The engine's contract is to
+// deliver the image bytes, the MIME type and the resolved tile size per
+// part; it does not generate texture coordinates.
+struct TextureAttrs {
+    std::string src;             // authoring path; cleared once lowered
+    std::string data;            // base64 image bytes (flat form)
+    std::string type;            // "image/png" | "image/jpeg"; may be empty
+    std::string scale_expr;      // tile size expression; "" = engine default
+
+    // True when no texture was authored at all (neither form).
+    bool empty() const { return src.empty() && data.empty(); }
+};
+
 struct PartAttrs {
     std::string name;            // optional in source; defaulted to filename
     std::string color;           // "#RRGGBB" or "#RGB"; empty if unset
+    TextureAttrs texture;        // spec 0.3; see TextureAttrs
 };
 
 struct DefAttrs {
@@ -257,6 +294,10 @@ struct DefAttrs {
     // When an Instance of a coloured def is evaluated inside a
     // colourless `<part>`, the engine propagates the def's colour up.
     std::string color;
+    // Same carrier role for an imported `<part texture="…">`: preserved
+    // on the def so a texture-less host part instancing it inherits
+    // the texture (spec 0.3, §5.1).
+    TextureAttrs texture;
 };
 
 struct AssemblyAttrs {

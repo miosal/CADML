@@ -35,6 +35,7 @@ cadmlstl hex-bolt/hex-bolt.cadml -o hex-bolt.stl       # full pipeline → STL
 | [`showcase-fillet-chamfer/`](showcase-fillet-chamfer/) | Six side-by-side blocks for `<fillet>`, `<chamfer>`, and `<shell>` — all-edge, selector-driven, composed, and the open-cap shell. One modifier element per block. |
 | [`propeller/`](propeller/) | 5-inch drone propeller: a 12-station polyhedral `<loft>` of Lua-computed Clark-Y airfoil sections, hub + bore, three blades via `<pattern>`. |
 | [`caster-wheel/`](caster-wheel/) | Multi-file assembly: a fork, axle, and wheel imported from their own files and emitted as three separately-coloured top-level `<part>`s. Demonstrates multi-part 3MF export with declared `<port>` attachment points on every piece. |
+| [`showcase-texture/`](showcase-texture/) | Spec-0.3 `<part texture="…" texture-scale="…">`: two parts sharing one `checker.png` at different tile sizes next to a colour-only cube. Textures are appearance only — the metrics of every part are unchanged by them. |
 | [`bolt-on-plate/`](bolt-on-plate/) | Canonical `<assembly>` + nested `at`/`port` mating model: a bolt's `head-seat` port mates a plate's `hole` port and the bundler solves the resulting transform. Assembly output is a single fused `<part>` — choose this pattern over the caster-wheel pattern when you want compiler-solved kinematics over per-part colours. |
 
 ## Recommended reading order

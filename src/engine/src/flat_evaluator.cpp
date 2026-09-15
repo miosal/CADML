@@ -11,6 +11,7 @@
 #include <cadml/expression.hpp>
 #include <cadml/selector.hpp>
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <functional>
@@ -1502,17 +1503,15 @@ FlatMesh eval_svg(const Document& doc, const Node& svg_node,
     return inner;
 }
 
-FlatMesh eval_part(const Document& doc, const Node& part_node,
-                    std::vector<FlatEvalError>& warnings,
-                    FlatMeshCache* cache)
+// Bind <param> children of `part_node` into `e`. If a default
+// expression throws (div-by-zero, undefined identifier, …) surface the
+// rich message as a warning so the user knows why a downstream
+// expression references an unbound param. promote_fatal_eval_warnings
+// keys off the div/mod-by-zero prefix and reclassifies to a hard error.
+void bind_part_params(const Document& doc, const Node& part_node,
+                       ExpressionEvaluator& e,
+                       std::vector<FlatEvalError>& warnings)
 {
-    ExpressionEvaluator e;
-    // Bind <param> children of the part into the eval scope. If the
-    // default expression throws (div-by-zero, undefined identifier,
-    // …) surface the rich message as a warning so the user knows
-    // why a downstream expression references an unbound param.
-    // promote_fatal_eval_warnings keys off the div/mod-by-zero
-    // prefix and reclassifies to a hard error.
     for (auto& child : doc.children(node_index(doc, part_node))) {
         if (child.dead) continue;
         if (child.type != NodeType::Param) continue;
@@ -1528,6 +1527,14 @@ FlatMesh eval_part(const Document& doc, const Node& part_node,
                 child.source });
         }
     }
+}
+
+FlatMesh eval_part(const Document& doc, const Node& part_node,
+                    std::vector<FlatEvalError>& warnings,
+                    FlatMeshCache* cache)
+{
+    ExpressionEvaluator e;
+    bind_part_params(doc, part_node, e, warnings);
     return eval_geometry_children(doc, part_node, e, warnings, cache,
                                     /*depth=*/0);
 }
@@ -1770,6 +1777,110 @@ std::string first_descendant_fill(const Document& doc, const Node& root) {
     return found;
 }
 
+// The texture a part inherits when it declares none of its own: the
+// first Instance (pre-order, following instances into their defs) whose
+// def carries a `texture` — the carrier the bundler leaves on a def
+// converted from an imported `<part texture="…">`. Mirrors the def-colour
+// half of first_descendant_fill; there is no primitive-level texture
+// analogue of `fill=`.
+const TextureAttrs* first_descendant_def_texture(const Document& doc,
+                                                  const Node& root) {
+    std::unordered_set<std::uint32_t> visited_defs;
+    std::function<const TextureAttrs*(const Node&)> walk;
+    walk = [&](const Node& nd) -> const TextureAttrs* {
+        if (nd.type == NodeType::Instance) {
+            const auto& ia = std::get<InstanceAttrs>(nd.attrs);
+            const auto it = doc.defs.find(ia.ref_name);
+            if (it != doc.defs.end() &&
+                visited_defs.insert(it->second).second) {
+                const auto& def_node = doc.nodes[it->second];
+                if (def_node.type == NodeType::Def) {
+                    const auto& da = std::get<DefAttrs>(def_node.attrs);
+                    if (!da.texture.empty()) return &da.texture;
+                    for (const auto& dc : doc.children(it->second)) {
+                        if (dc.dead) continue;
+                        if (const auto* t = walk(dc)) return t;
+                    }
+                }
+            }
+        }
+        for (const auto& c : doc.children(node_index(doc, nd))) {
+            if (c.dead) continue;
+            if (const auto* t = walk(c)) return t;
+        }
+        return nullptr;
+    };
+    return walk(root);
+}
+
+// Decode a resolved TextureAttrs into the renderer-facing PartTexture.
+// `scale_expr` is evaluated in the part's param scope; an unset or
+// non-positive scale falls back to the mesh's largest AABB extent (1.0
+// for an empty mesh) so consumers always receive a usable tile size.
+// Returns nullopt (with a warning) when the image cannot be delivered.
+std::optional<PartTexture> resolve_part_texture(const Document& doc,
+                                                const Node& part_node,
+                                                const TextureAttrs& t,
+                                                const FlatMesh& mesh,
+                                                std::vector<FlatEvalError>& warnings)
+{
+    if (t.data.empty()) {
+        warnings.push_back({
+            t.src.empty()
+                ? "texture: no image — set `texture-data` (base64 image)"
+                  " or a `texture` path the bundler can resolve"
+                : "texture: `texture=\"" + t.src + "\"` was not embedded;"
+                  " compile the document so the bundler inlines the file",
+            part_node.source });
+        return std::nullopt;
+    }
+    if (t.type != "image/png" && t.type != "image/jpeg") {
+        warnings.push_back({
+            t.type.empty()
+                ? std::string("texture: `texture-data` has no `texture-type`")
+                : "texture: unsupported `texture-type` `" + t.type +
+                  "` (image/png or image/jpeg)",
+            part_node.source });
+        return std::nullopt;
+    }
+    auto bytes = base64_decode(t.data);
+    if (!bytes || bytes->empty()) {
+        warnings.push_back({ "texture: `texture-data` is not valid base64",
+                             part_node.source });
+        return std::nullopt;
+    }
+
+    double scale = 0;
+    if (!t.scale_expr.empty()) {
+        ExpressionEvaluator e;
+        bind_part_params(doc, part_node, e, warnings);
+        scale = eval_num(e, t.scale_expr, part_node.source, warnings,
+                         "texture-scale");
+        if (!(scale > 0)) {
+            warnings.push_back({
+                "texture: `texture-scale` must be positive (got `" +
+                t.scale_expr + "`); using the part's extent instead",
+                part_node.source });
+            scale = 0;
+        }
+    }
+    if (!(scale > 0)) {
+        double extent = 0;
+        if (!mesh.vertices.empty()) {
+            Vec3 lo = mesh.vertices.front(), hi = lo;
+            for (const auto& v : mesh.vertices) {
+                lo.x = std::min(lo.x, v.x); hi.x = std::max(hi.x, v.x);
+                lo.y = std::min(lo.y, v.y); hi.y = std::max(hi.y, v.y);
+                lo.z = std::min(lo.z, v.z); hi.z = std::max(hi.z, v.z);
+            }
+            extent = std::max({ hi.x - lo.x, hi.y - lo.y, hi.z - lo.z });
+        }
+        scale = extent > 0 ? extent : 1.0;
+    }
+
+    return PartTexture{ t.type, std::move(*bytes), scale };
+}
+
 void collect_parts(const Document& doc, FlatEvalResult& out,
                     FlatMeshCache* cache)
 {
@@ -1793,10 +1904,18 @@ void collect_parts(const Document& doc, FlatEvalResult& out,
         if (color.empty()) {
             color = first_descendant_fill(doc, n);
         }
-        out.parts.push_back({
-            pa.name,
-            color,
-            eval_part(doc, n, out.warnings, cache) });
+        FlatEvalResult::Part part{ pa.name, color,
+                                   eval_part(doc, n, out.warnings, cache),
+                                   std::nullopt };
+        // Texture resolution order mirrors colour: the part's own
+        // `texture`, else the one carried by an instanced def.
+        const TextureAttrs* tex = pa.texture.empty()
+            ? first_descendant_def_texture(doc, n) : &pa.texture;
+        if (tex) {
+            part.texture = resolve_part_texture(doc, n, *tex, part.mesh,
+                                                out.warnings);
+        }
+        out.parts.push_back(std::move(part));
     }
 }
 

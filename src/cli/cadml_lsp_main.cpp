@@ -80,7 +80,7 @@ constexpr SpecEntry kElements[] = {
 };
 
 constexpr SpecEntry kFrontmatter[] = {
-    {"version", "CADML setting", "Spec version: 0.1 or 0.2 (patch forms like 0.2.0 accepted).", "version 0.2"},
+    {"version", "CADML setting", "Spec version: 0.1, 0.2 or 0.3 (patch forms like 0.3.0 accepted).", "version 0.3"},
     {"units", "CADML setting", "Document units: mm, cm, m, in, or ft.", "units mm"},
     {"description", "CADML setting", "Quoted human-readable document description.", "description \"$1\""},
     {"tags", "CADML setting", "Quoted space-separated searchable tags.", "tags \"$1\""},
@@ -93,6 +93,8 @@ constexpr SpecEntry kFrontmatter[] = {
 constexpr SpecEntry kAttributes[] = {
     {"name", "CADML attribute", "Names a part, assembly, def, port, or param.", "name=\"$1\""},
     {"color", "CADML attribute", "Presentation color as #RGB or #RRGGBB.", "color=\"$1\""},
+    {"texture", "CADML attribute", "Surface texture image (.png/.jpg) for a part or def, path relative to the document. Requires version 0.3.", "texture=\"$1\""},
+    {"texture-scale", "CADML attribute", "Size in document units of one texture tile (default: the part's largest extent).", "texture-scale=\"$1\""},
     {"id", "CADML attribute", "Names an instance or group for references.", "id=\"$1\""},
     {"at", "CADML attribute", "Parent port used for mating an instance.", "at=\"$1\""},
     {"port", "CADML attribute", "Own port used for mating an instance.", "port=\"$1\""},

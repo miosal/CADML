@@ -114,17 +114,32 @@ bool is_reserved_instance_attr(std::string_view name) {
 
 // ─── Per-element attribute extraction ────────────────────────────────────
 
+// Shared by <part> and <def>: the four `texture*` attributes of spec 0.3
+// §5.1. Read unconditionally — an older-spec document that carries them
+// is diagnosed by the bundler (§15.2), where the error can name the
+// version to bump, rather than silently dropped here.
+TextureAttrs build_texture_attrs(const pugi::xml_node& n) {
+    TextureAttrs t;
+    t.src        = attr(n, "texture");
+    t.data       = attr(n, "texture-data");
+    t.type       = attr(n, "texture-type");
+    t.scale_expr = attr(n, "texture-scale");
+    return t;
+}
+
 NodeAttrs build_part_attrs(const pugi::xml_node& n) {
     PartAttrs a;
-    a.name  = attr(n, "name");
-    a.color = attr(n, "color");
+    a.name    = attr(n, "name");
+    a.color   = attr(n, "color");
+    a.texture = build_texture_attrs(n);
     return a;
 }
 
 NodeAttrs build_def_attrs(const pugi::xml_node& n) {
     DefAttrs a;
-    a.name  = attr(n, "name");
-    a.color = attr(n, "color");
+    a.name    = attr(n, "name");
+    a.color   = attr(n, "color");
+    a.texture = build_texture_attrs(n);
     return a;
 }
 

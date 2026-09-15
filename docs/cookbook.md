@@ -580,6 +580,33 @@ then difference.
 
 ---
 
+## Recipe 16 — Textures (spec 0.3)
+
+Appearance only. Put an image next to the file and reference it from
+the `<part>`; the compiler embeds it, the renderer tiles it over every
+face by triplanar projection. `texture-scale` is the size of one tile in
+document units — think "how big is one brick / one grass clump".
+
+```xml
+version 0.3
+units mm
+
+<part name="wall" color="#b0553a" texture="brick.jpg" texture-scale="215">
+  <extrude height="2400"><rect width="3000" height="200"/></extrude>
+</part>
+```
+
+- `.png` and `.jpg`/`.jpeg` only; relative paths only (no `..` escapes).
+- Leave `texture-scale` out and the image tiles once across the part's
+  largest dimension.
+- `color` stays as the fallback for consumers without texture support.
+- One texture per part. Two materials on one body → two `<part>`s (the
+  same rule as per-part colours; see `examples/caster-wheel/`).
+- Textures never change volume, mass, exports or checks —
+  `examples/showcase-texture/` is the reference file.
+
+---
+
 ## Naming params
 
 - **Semantic role, not abbreviation.** `thread-d` (thread diameter)

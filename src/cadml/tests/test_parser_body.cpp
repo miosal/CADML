@@ -625,3 +625,44 @@ TEST(BodyParser, DeeplyNestedTree) {
     // circle → extrude → difference → group → group → part = 5 steps
     EXPECT_EQ(depth, 5u);
 }
+
+// ─── texture attributes (spec 0.3 §5.1) ──────────────────────────────
+
+TEST(BodyParser, PartTextureAttrs) {
+    auto r = parse_body_str(
+        R"XML(<part name="wall" color="#888" texture="brick.png" texture-scale="{2 * 125}"/>)XML");
+    ASSERT_EQ(r.nodes.size(), 1u);
+    const auto& p = std::get<PartAttrs>(r.nodes[0].attrs);
+    EXPECT_EQ(p.color, "#888");
+    EXPECT_EQ(p.texture.src, "brick.png");
+    EXPECT_EQ(p.texture.scale_expr, "{2 * 125}");
+    EXPECT_TRUE(p.texture.data.empty());
+    EXPECT_TRUE(p.texture.type.empty());
+    EXPECT_FALSE(p.texture.empty());
+}
+
+TEST(BodyParser, PartTextureEmbeddedForm) {
+    auto r = parse_body_str(
+        R"XML(<part texture-data="QUJDRA==" texture-type="image/jpeg"/>)XML");
+    const auto& p = std::get<PartAttrs>(r.nodes[0].attrs);
+    EXPECT_EQ(p.texture.data, "QUJDRA==");
+    EXPECT_EQ(p.texture.type, "image/jpeg");
+    EXPECT_TRUE(p.texture.src.empty());
+}
+
+TEST(BodyParser, PartWithoutTextureHasEmptyTextureAttrs) {
+    auto r = parse_body_str(R"XML(<part name="p" color="red"/>)XML");
+    const auto& p = std::get<PartAttrs>(r.nodes[0].attrs);
+    EXPECT_TRUE(p.texture.empty());
+    EXPECT_TRUE(p.texture.scale_expr.empty());
+}
+
+TEST(BodyParser, DefTextureAttrs) {
+    // <def> carries the same quartet (the bundler's carrier for an
+    // imported <part texture>).
+    auto r = parse_body_str(
+        R"XML(<def name="plank" texture="oak.jpg" texture-scale="40"/>)XML");
+    const auto& d = std::get<DefAttrs>(r.nodes[0].attrs);
+    EXPECT_EQ(d.texture.src, "oak.jpg");
+    EXPECT_EQ(d.texture.scale_expr, "40");
+}
