@@ -472,7 +472,7 @@ export const EXAMPLES: Example[] = [
   {
     id:    'tealight-holder',
     title: 'Tea-light holder',
-    blurb: 'Chamfered base plate, filleted top rim, hollow open-top cup with a revolved ogee collar — fillet, chamfer, shell, and revolve composed on one part.',
+    blurb: 'Chamfered base plate, filleted top rim, hollow open-top cup with a revolved ogee collar: fillet, chamfer, shell, and revolve composed on one part.',
     files: [
       { path: 'tealight-holder.cadml', contents: ENCLOSURE_CADML },
     ],
