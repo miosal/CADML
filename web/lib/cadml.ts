@@ -19,7 +19,33 @@ export interface CompileResult {
 
 export interface InMemoryFile {
   path: string;
-  contents: string;
+  // Source text, or the raw bytes of a binary asset (the PNG / JPEG a
+  // `<part texture="…">` refers to).
+  contents: string | Uint8Array;
+}
+
+// A part's surface image (spec 0.3 `texture`). CADML meshes carry no
+// UVs: `scale` is the world-space size of one tile and the viewer maps
+// the image by triplanar projection.
+export interface SceneTexture {
+  mime:  string;       // 'image/png' | 'image/jpeg'
+  bytes: Uint8Array;   // the image file, as-is
+  scale: number;       // document units per tile, always > 0
+}
+
+export interface ScenePart {
+  name:    string;
+  color:   string;              // '#rrggbb' as authored, '' when none
+  stl:     Uint8Array;          // this part alone, binary STL
+  texture: SceneTexture | null;
+}
+
+// One compile + one evaluation. `parts` is empty when `ok` is false.
+export interface SceneResult {
+  ok:       boolean;
+  errors:   string;
+  warnings: string;
+  parts:    ScenePart[];
 }
 
 export interface CadmlModule {
@@ -28,6 +54,8 @@ export interface CadmlModule {
   export3mfFromSource(src: string): Uint8Array | null;
   compileProject(files: InMemoryFile[], entry: string): CompileResult;
   exportStlFromProject(files: InMemoryFile[], entry: string): Uint8Array | null;
+  sceneFromSource(src: string): SceneResult;
+  sceneFromProject(files: InMemoryFile[], entry: string): SceneResult;
 }
 
 interface FactoryOptions {

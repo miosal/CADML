@@ -40,3 +40,17 @@ target_compile_definitions(cadml_regen_example_metrics PRIVATE
     CADML_EXAMPLES_DIR="${CMAKE_SOURCE_DIR}/examples"
     CADML_METRICS_MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
+
+# `cadmlstl --part`: per-part export (used by hosts that need one mesh per
+# part, e.g. textured renders) and the unknown-name failure path.
+if (TARGET cadmlstl)
+    add_test(NAME cadmlstl_part_filter
+        COMMAND cadmlstl ${CMAKE_SOURCE_DIR}/examples/showcase-texture/showcase-texture.cadml
+                -p tile -p cube -o ${CMAKE_CURRENT_BINARY_DIR}/part_filter.stl)
+    set_tests_properties(cadmlstl_part_filter PROPERTIES
+        PASS_REGULAR_EXPRESSION "from 2 part\\(s\\)")
+    add_test(NAME cadmlstl_part_filter_unknown_name
+        COMMAND cadmlstl ${CMAKE_SOURCE_DIR}/examples/showcase-texture/showcase-texture.cadml
+                -p no-such-part -o ${CMAKE_CURRENT_BINARY_DIR}/part_filter_bad.stl)
+    set_tests_properties(cadmlstl_part_filter_unknown_name PROPERTIES WILL_FAIL TRUE)
+endif()

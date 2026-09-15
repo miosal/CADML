@@ -20,17 +20,20 @@ export interface Example {
 
 // First .cadml file an example is keyed to — what the editor renders.
 export function entrySource(e: Example): string {
-  return e.files.find((f) => f.path === e.entry)?.contents ?? '';
+  const c = e.files.find((f) => f.path === e.entry)?.contents;
+  return typeof c === 'string' ? c : '';
 }
 
-// First <part color="..."> on the entry source. STL is a single
-// triangle soup so we pick one colour per example.
-export function firstPartColor(src: string): string {
-  const m = src.match(/<part[^>]*color\s*=\s*"(#[0-9a-fA-F]{3,8})"/);
-  return m ? m[1] : '#9090a0';
+// Binary assets (texture images) are inlined as base64 so the example
+// list stays one self-contained module.
+function bytesFromBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
-const COMPRESSOR_CADML = `version 0.2
+const COMPRESSOR_CADML = `version 0.3
 units mm
 
 import "compressor.lua"
@@ -190,11 +193,10 @@ function blade_section(h, t)
 end
 `;
 
-// Caster wheel assembly — flattened from the canonical 4-file example
+// Caster wheel assembly, flattened from the canonical 4-file example
 // (caster-wheel/{caster-wheel,fork,axle,wheel}.cadml) into one source
-// for the editor pane. STL export merges all parts into a single
-// triangle soup, so the rendered colour comes from the first <part>.
-const CASTER_WHEEL_CADML = `version 0.2
+// for the editor pane. Each top-level <part> renders in its own colour.
+const CASTER_WHEEL_CADML = `version 0.3
 units mm
 description "Caster-wheel assembly: a fork, an axle, and a wheel emitted as three top-level <part>s. The canonical example splits these into four files; the geometry is flattened here for a single-pane view."
 
@@ -287,7 +289,7 @@ param tread-d         = 38
 </part>
 `;
 
-const ENCLOSURE_CADML = `version 0.2
+const ENCLOSURE_CADML = `version 0.3
 units mm
 description "Tea-light holder exercising fillet, chamfer, shell, and revolve on one part. The base plate is a chamfered + filleted rectangle (bevel at the floor, rounded top rim). The candle cup is a hollow open-top cylinder built with <shell>. A collar revolved from a six-point ogee profile straddles the cup's top edge — the inner edge sits flush with the cup wall so the <union> melds into one continuous outer surface."
 
@@ -350,6 +352,99 @@ param base-bevel  = 2
 </part>
 `;
 
+// ── Planter (textures) ────────────────────────────────────────────────
+//
+// Mirrors the authoring form of examples/showcase-texture: the source
+// names image files next to it (`texture="brick.png"`), which the
+// bundler inlines. The two tiles are tiny procedural PNGs (64 px
+// brick, 32 px grass) held here as base64.
+
+const PLANTER_CADML = `version 0.3
+units mm
+description "Raised garden bed: a brick wall ring with a timber coping and a lawn inside. The brick and grass are image textures on the parts, tiled by the renderer; the geometry is three plain bodies."
+
+param bed-l    = 900
+param bed-w    = 600
+param bed-h    = 360
+param wall-t   = 105
+param cap-t    = 30
+param cap-lip  = 20
+param soil-gap = 60
+
+<!-- Four brick courses per texture tile: 75 mm course pitch. -->
+<part name="walls" texture="brick.png" texture-scale="300">
+  <difference>
+    <extrude height="{bed-h}">
+      <rect width="{bed-l}" height="{bed-w}"/>
+    </extrude>
+    <group transform="translate({wall-t}, {wall-t}, -1)">
+      <extrude height="{bed-h + 2}">
+        <rect width="{bed-l - 2*wall-t}" height="{bed-w - 2*wall-t}"/>
+      </extrude>
+    </group>
+  </difference>
+</part>
+
+<!-- Timber coping overhanging the wall by cap-lip on every side. -->
+<part name="coping" color="#8a6a45">
+  <group transform="translate({-cap-lip}, {-cap-lip}, {bed-h})">
+    <difference>
+      <extrude height="{cap-t}">
+        <rect width="{bed-l + 2*cap-lip}" height="{bed-w + 2*cap-lip}"/>
+      </extrude>
+      <group transform="translate({wall-t + cap-lip}, {wall-t + cap-lip}, -1)">
+        <extrude height="{cap-t + 2}">
+          <rect width="{bed-l - 2*wall-t}" height="{bed-w - 2*wall-t}"/>
+        </extrude>
+      </group>
+    </difference>
+  </group>
+</part>
+
+<!-- The lawn fills the ring up to soil-gap below the rim. -->
+<part name="lawn" texture="grass.png" texture-scale="120">
+  <group transform="translate({wall-t}, {wall-t}, 0)">
+    <extrude height="{bed-h - soil-gap}">
+      <rect width="{bed-l - 2*wall-t}" height="{bed-w - 2*wall-t}"/>
+    </extrude>
+  </group>
+</part>
+`;
+
+const BRICK_PNG = bytesFromBase64(
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABV0lEQVR42u2ZMU4DMRBF/876' +
+  'COEK0KRAFNQUHAQuEKSkiyCCFFsEKURRlCpcggOkpKCghJ4CwSHGojBaJVRr5FG8ynexu1P4' +
+  'W9bssz3fxfP6CW1ugpY3F15vk1sRERFVrZ9JwqPBDYDP5SS58m8YJlCWpffeex8+EoZB30I5' +
+  'PN3mAKoaJqOqqcJaP7lyCLcyYJEH6wyLdYr/6CcfyFmnuM5AcuUQEmJCTIgJMSHeb4gL1gM7' +
+  'bsXi/DjqLH4yHAP4Wk2N6oeDyysAr9Woad/c/unYVcv9Y33IatVyuW1Mm/pN+kpuG1Ps0UNi' +
+  'R6oHMJpD7L5EiAkxISbEhHi/IWY9kMn9wPv9nYl5L3LYvwbwMa+M6gcaWzS2aGzR2CLEhJgQ' +
+  'E2JC3GKIWQ/s/H5gdtaNOoufjioA348PRvVD56IH4GU8bNiXxhaNLRpbNLYIMSEmxISYELcY' +
+  '4h+s8CoX+OtiFgAAAABJRU5ErkJggg=='
+);
+
+const GRASS_PNG = bytesFromBase64(
+  'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAD9klEQVR42m1WTW/bSAylbEXj' +
+  '2NLAH2oRy24NuHvwYQ9G0VPv/Qf9CXvY39Jfl1tyUm4DF1ViY2QkGsOB9/DcV64cwTCoEcnh' +
+  'kI+PE33996/VuhAREbm/dek4EZH90wErq3Vxf+u0AoRiaV3p9Vfv9yJibUodmHdojMcOe3bY' +
+  'wzftkXKxtPRONe/31qbWplRGoPe3Lr6MCwIiuvQuItDBIkyKpaUTuEag1qYdBkVLyBSQB71Z' +
+  'Ok7gMR0nMOGBYIIcIILu9fyq3oZsZOptOMe+a0JzDM3x0T2LSLWp4TSfDmBmerGInKKTiOTT' +
+  'wWwxqTZ1tanhPTRHKIhIvQ3dD1/G+JCNTDYyftcghNAcaQxHfteYXuxKf4pOoTlCzZU+v8mS' +
+  'fnSKTvCLf1f6ehvScdL98GU8W0we7qp6GxAUosAxH+6qdJwcXl7rbcB/sbT0jhirTZ2NjA7c' +
+  '75p8OjhFJzvsRd9/fP5T2N/hI4R0nDCbfKBDyHERMgTq2GGv86Z3gsHvGld6a1NXeld6bYle' +
+  'IaIoax0ROfcBQ6ABcAYvQBHxB30ANB0nftewMc/oVK661/OrYmkf3XM2MoANakgU8cmnAyQa' +
+  'P2jaYe/d+2G1qWeLSdKPsDcU6m04owj4sTYFHlDh0BwPL6/og6QfZSPjSn94eYWQjQwA40oP' +
+  'mKHUyA/Wi6Wtt6EDAkGX64aaf8zJBMzbal1Q1tWmGrOK12JpY00G7GFXeiceJKNJzfs9dJD3' +
+  '+cfcidetzsYm8cQkO3pnCJeUqeGrj3j5kNZivYoleOR+mjKBJbCYTqnm85Zh93p+VW3q/CYL' +
+  '4TBbTPKbTESAB1IYLEFZj+653oakHz3cVS3vNNS23W///J30I2MSY5L7W5f0o18/PeA4W0y0' +
+  'JWC3WhfVpgZn4FVXERAHRsGAMY5p1+klAbSm2Bk8qs74yiLrTmRROy1Lv2tAD1jROeXYIKlw' +
+  '6nEMtOjA75rO2cbv4RpAJgaYTb1CjkLZW8qAP0/THX4aQANMgDGA8QDWzUbGmCSEA7qX/QX2' +
+  'BmOjHhA4LUA/MWy4Ic7xv2vA74sCdC6LhL5BlNoWK9H3H591Z+sU62y2Pl3qsFRtukbWNOR1' +
+  '3+lFV/r90+FyBGm/9I5j+V0Ts0SoMzfnou7MNyNw8sbR+Rpbm6IJgDYGQptL5LWGmqaW/dMB' +
+  'IOQ2se4jlAG+qKfRqZuRPMgCkCX102mxqbUpBL6u1gV1wHQtR4hJl5pQdKXvXs+vcMyHuwqM' +
+  'D2jjnmNMQi4C02UjM1tMwIwIH90AjsJwfHTP+XSAEdkh4fC8aAtwMhPIqceRwrzrI7aY/3z5' +
+  'JaVgD3jHUNOzjKj9Qz42xeDTnKivxiLyHzjLguSPzqzSAAAAAElFTkSuQmCC'
+);
+
 export const EXAMPLES: Example[] = [
   {
     id:    'compressor',
@@ -376,10 +471,21 @@ export const EXAMPLES: Example[] = [
   {
     id:    'tealight-holder',
     title: 'Tea-light holder',
-    blurb: 'Chamfered base plate, filleted top rim, hollow open-top cup with a revolved ogee collar — fillet, chamfer, shell, and revolve composed on one part.',
+    blurb: 'Chamfered base plate, filleted top rim, hollow open-top cup with a revolved ogee collar: fillet, chamfer, shell, and revolve composed on one part.',
     files: [
       { path: 'tealight-holder.cadml', contents: ENCLOSURE_CADML },
     ],
     entry: 'tealight-holder.cadml',
+  },
+  {
+    id:    'planter',
+    title: 'Planter',
+    blurb: 'Brick ring, timber coping and a lawn: three plain bodies with brick and grass image textures attached through the 0.3 <part texture> attribute.',
+    files: [
+      { path: 'planter.cadml', contents: PLANTER_CADML },
+      { path: 'brick.png',     contents: BRICK_PNG     },
+      { path: 'grass.png',     contents: GRASS_PNG     },
+    ],
+    entry: 'planter.cadml',
   },
 ];

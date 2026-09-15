@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Caster fork — U-bracket with a flat mounting plate on top and two legs that hang down to carry the axle. Local frame: +z is up, the axle line runs along the y-axis at z = 0 (the BOTTOM of the legs), the legs extend upward from z = 0 to z = leg-h, the mounting plate sits on top of the legs (z = leg-h to leg-h + plate-t). Three ports: `mount` (top of the plate, attaches to the furniture this caster carries) and `axle-l` / `axle-r` (the two axle-hole faces on the outside of the legs)."
 

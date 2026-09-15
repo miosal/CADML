@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "SVG curve commands inside <svg>: cubic Bezier (C/S), quadratic (Q/T), elliptical arc (A) plus rounded-corner construction. One part per curve family. Pasted with SVG y-down coordinates; the <svg> wrapper handles the y-flip."
 

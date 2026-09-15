@@ -214,7 +214,7 @@ each compiler pass.
 ```
 Document
 ├── frontmatter
-│   ├── version: "0.2"
+│   ├── version: "0.3"
 │   ├── units:   "mm"
 │   ├── description: optional<string>
 │   ├── tags:    optional<string>

@@ -225,15 +225,27 @@ void emit_children_or_close(std::ostream& os, const Document& doc,
     os << "</" << tag << ">\n";
 }
 
+// The spec-0.3 `texture*` quartet shared by <part> and <def>. Each
+// attribute is emitted only when set, so a texture-less element
+// serialises exactly as it did before 0.3.
+void emit_texture_attrs(std::ostream& os, const TextureAttrs& t) {
+    emit_attr(os, "texture",       t.src);
+    emit_attr(os, "texture-data",  t.data);
+    emit_attr(os, "texture-type",  t.type);
+    emit_attr(os, "texture-scale", t.scale_expr);
+}
+
 void emit_attrs(std::ostream& os, const Node& n) {
     std::visit([&](const auto& a) {
         using A = std::decay_t<decltype(a)>;
         if constexpr (std::is_same_v<A, PartAttrs>) {
             emit_attr(os, "name",  a.name);
             emit_attr(os, "color", a.color);
+            emit_texture_attrs(os, a.texture);
         } else if constexpr (std::is_same_v<A, DefAttrs>) {
             emit_attr(os, "name",  a.name);
             emit_attr(os, "color", a.color);
+            emit_texture_attrs(os, a.texture);
         } else if constexpr (std::is_same_v<A, AssemblyAttrs>) {
             emit_attr(os, "name", a.name);
         } else if constexpr (std::is_same_v<A, ConnectAttrs>) {

@@ -220,3 +220,38 @@ TEST(SpecVersion, ToStringRendersMajorMinor) {
     EXPECT_EQ(to_string(kSpecV01), "0.1");
     EXPECT_EQ(to_string(kSpecV02), "0.2");
 }
+
+// ─── Spec 0.3 (texture attributes) ───────────────────────────────────
+
+TEST(SpecVersion, Spec03IsTheLatestKnownVersion) {
+    // `texture*` attributes (spec §5.1) are gated on 0.3; the constant
+    // every acceptance / pinning check derives from must name it.
+    EXPECT_EQ(kSpecLatest, kSpecV03);
+    EXPECT_LT(kSpecV02, kSpecV03);
+    EXPECT_EQ(spec_version_from_string("0.3"),     kSpecV03);
+    EXPECT_EQ(spec_version_from_string("0.3.1"),   kSpecV03);
+    EXPECT_EQ(spec_version_parse_strict("0.3"),    kSpecV03);
+    EXPECT_EQ(spec_version_parse_strict("0.3.0"),  kSpecV03);
+    EXPECT_EQ(to_string(kSpecV03), "0.3");
+}
+
+TEST(SpecVersion, Spec03AddsNoReservedElementNames) {
+    // 0.3 is an attribute-only revision: the reserved-name set a 0.3
+    // file sees is exactly the 0.2 set (`stl` still the newest name).
+    EXPECT_EQ(node_type_from_builtin_name("stl", kSpecV03), NodeType::Stl);
+    EXPECT_EQ(node_type_from_builtin_name("texture", kSpecV03),
+              NodeType::Unknown);
+    EXPECT_EQ(builtin_since("texture"), std::nullopt);
+}
+
+TEST(TextureAttrs, EmptyMeansNoImageSource) {
+    TextureAttrs t;
+    EXPECT_TRUE(t.empty());
+    t.scale_expr = "10";           // a scale alone is not a texture
+    EXPECT_TRUE(t.empty());
+    t.src = "grass.png";
+    EXPECT_FALSE(t.empty());
+    t.src.clear();
+    t.data = "AAAA";
+    EXPECT_FALSE(t.empty());
+}

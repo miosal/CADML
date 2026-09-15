@@ -27,6 +27,10 @@ param overshoot = 1
   </difference>
 </part>`;
 
+// A 32x32 RGB checker PNG (the same image as examples/showcase-texture).
+const CHECKER_PNG = Uint8Array.from(Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAOUlEQVR42mM4uaIGK6qKssCKSFXPMGrBqAVDwAJqGYRL/agFoxYMBQtGi4pRC0YtGK0PRi0YtQCIAGby8kywFxDeAAAAAElFTkSuQmCC', 'base64'));
+
 let failures = 0;
 function check(name, cond, detail) {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
@@ -71,7 +75,55 @@ createCadml().then((M) => {
   check('project inlined import as <def name="lib">',
         proj.ok && proj.fcadml.includes('<def name="lib"'));
 
-  // 5. Error path surfaces cleanly (no crash). Missing `version` is a
+  // 5. Scene API: one part per top-level <part>, each with its own STL,
+  //    colour and (spec 0.3) texture. The PNG comes in as a Uint8Array
+  //    file next to the source, exactly as a browser host supplies it.
+  const scene = M.sceneFromProject(
+    [ { path: 'main.cadml',
+        contents: 'version 0.3\n' +
+          '<part name="tile" texture="tex.png" texture-scale="7.5">' +
+          '<extrude height="2"><rect width="10" height="10"/></extrude></part>\n' +
+          '<part name="plain" color="#336699">' +
+          '<extrude height="1"><circle r="3"/></extrude></part>' },
+      { path: 'tex.png', contents: CHECKER_PNG } ],
+    'main.cadml');
+  check('sceneFromProject ok', scene.ok, scene.errors || '');
+  check('scene has two parts', scene.parts.length === 2,
+        scene.parts.length + ' parts');
+  if (scene.parts.length === 2) {
+    const [tile, plain] = scene.parts;
+    check('part names in document order',
+          tile.name === 'tile' && plain.name === 'plain');
+    check('untextured part: color, texture null',
+          plain.color === '#336699' && plain.texture === null);
+    const t = tile.texture;
+    check('textured part: mime + scale resolved',
+          !!t && t.mime === 'image/png' && t.scale === 7.5,
+          t ? `${t.mime} scale ${t.scale}` : 'null');
+    check('texture bytes round-trip the PNG',
+          !!t && t.bytes.length === CHECKER_PNG.length &&
+          t.bytes.every((b, i) => b === CHECKER_PNG[i]));
+    // A 10x10x2 box is 12 triangles; a disc has many more.
+    const tri = (stl) => new DataView(stl.buffer, stl.byteOffset, stl.byteLength).getUint32(80, true);
+    check('per-part STL framing', tile.stl.length === 84 + 50 * tri(tile.stl) &&
+          plain.stl.length === 84 + 50 * tri(plain.stl));
+    check('per-part STL is that part alone', tri(tile.stl) === 12,
+          tri(tile.stl) + ' triangles');
+  }
+  // A missing asset is a compile error: ok=false, no parts, message.
+  const noTex = M.sceneFromProject(
+    [ { path: 'main.cadml',
+        contents: 'version 0.3\n<part texture="gone.png"><extrude height="1"><circle r="1"/></extrude></part>' } ],
+    'main.cadml');
+  check('scene reports a missing texture file',
+        !noTex.ok && noTex.parts.length === 0 && /gone\.png/.test(noTex.errors),
+        (noTex.errors.split('\n')[0] || '(no message)'));
+  const sceneSrc = M.sceneFromSource(PLATE);
+  check('sceneFromSource ok with one part',
+        sceneSrc.ok && sceneSrc.parts.length === 1 && sceneSrc.parts[0].name === 'plate' &&
+        sceneSrc.parts[0].texture === null);
+
+  // 6. Error path surfaces cleanly (no crash). Missing `version` is a
   //    real parse error (unlike an unknown element, which defers to an
   //    instance — matching native cadmlc, which also accepts that).
   const bad = M.compileSource('<part name="x"><circle r="5"/></part>');

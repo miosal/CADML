@@ -221,10 +221,12 @@ TEST(Bundler, Spec02VersionAccepted) {
 }
 
 TEST(Bundler, UnknownSpecVersionRejected) {
-    auto r = cs("version 0.3\n<part name=\"p\"/>");
+    // One past kSpecLatest (0.3 as of the texture revision).
+    auto r = cs("version 0.4\n<part name=\"p\"/>");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.errors[0].message.find("unrecognized spec version"),
               std::string::npos);
+    EXPECT_NE(r.errors[0].message.find("0.3.x"), std::string::npos);
 }
 
 TEST(Bundler, StlNotReservedInSpec01) {
@@ -607,4 +609,88 @@ TEST(Bundler, DefReusedFromPartIsNotACycle) {
         "  <hole/>\n"
         "</part>");
     EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+}
+
+// ─── texture="…" (spec 0.3 §5.1) ─────────────────────────────────────
+
+TEST(Bundler, Spec03Accepted) {
+    auto r = cs("version 0.3\n<part name=\"p\"><circle r=\"1\"/></part>");
+    EXPECT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_NE(r.flat_text.find("version 0.3.0"), std::string::npos);
+}
+
+TEST(Bundler, TextureInSpec02DocumentIsCompileError) {
+    // §15.2 pinning: `texture*` attributes are 0.3 vocabulary. Under a
+    // 0.2 declaration they used to be silently-ignored unknown
+    // attributes; now they are a stale `version` — fail with the
+    // version to bump, like <stl> in a 0.1 file.
+    for (const char* attrs : {
+            "texture-data=\"AAAA\" texture-type=\"image/png\"",
+            "texture=\"grass.png\"",
+            "texture-scale=\"10\"" }) {
+        auto r = cs(std::string("version 0.2\n<part name=\"p\" ") + attrs +
+                    "><circle r=\"1\"/></part>");
+        ASSERT_FALSE(r.ok()) << attrs;
+        EXPECT_EQ(r.errors[0].category, CompileError::Vocabulary) << attrs;
+        EXPECT_NE(r.errors[0].message.find("since spec version 0.3"),
+                  std::string::npos) << attrs;
+        EXPECT_NE(r.errors[0].message.find("bump the `version`"),
+                  std::string::npos) << attrs;
+    }
+}
+
+TEST(Bundler, TextureEmbeddedFormCompilesClean) {
+    auto r = cs(
+        "version 0.3\n"
+        "<part name=\"p\" texture-data=\"AAAA\" texture-type=\"image/png\""
+        " texture-scale=\"25\"><circle r=\"1\"/></part>");
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    EXPECT_NE(r.flat_text.find("texture-data=\"AAAA\""), std::string::npos);
+    EXPECT_NE(r.flat_text.find("texture-type=\"image/png\""), std::string::npos);
+    EXPECT_NE(r.flat_text.find("texture-scale=\"25\""), std::string::npos);
+}
+
+TEST(Bundler, TextureBothSourcesRejected) {
+    auto r = cs(
+        "version 0.3\n"
+        "<part texture=\"a.png\" texture-data=\"AAAA\" texture-type=\"image/png\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Schema);
+    EXPECT_NE(r.errors[0].message.find("exactly one source"),
+              std::string::npos);
+}
+
+TEST(Bundler, TextureDataWithoutTypeRejected) {
+    auto r = cs("version 0.3\n<part texture-data=\"AAAA\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Schema);
+    EXPECT_NE(r.errors[0].message.find("needs a `texture-type`"),
+              std::string::npos);
+}
+
+TEST(Bundler, TextureUnsupportedTypeRejected) {
+    auto r = cs(
+        "version 0.3\n"
+        "<part texture-data=\"AAAA\" texture-type=\"image/webp\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Schema);
+    EXPECT_NE(r.errors[0].message.find("not supported"), std::string::npos);
+}
+
+TEST(Bundler, TextureScaleWithoutImageRejected) {
+    auto r = cs("version 0.3\n<part texture-scale=\"10\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Schema);
+    EXPECT_NE(r.errors[0].message.find("without a texture image"),
+              std::string::npos);
+}
+
+TEST(Bundler, TextureSrcInSingleFileModeRejected) {
+    // No base_dir → nothing to resolve the path against; fail here
+    // rather than at eval with a texture-less part.
+    auto r = cs("version 0.3\n<part texture=\"grass.png\"/>");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Import);
+    EXPECT_NE(r.errors[0].message.find("no base directory"),
+              std::string::npos);
 }

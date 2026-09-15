@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Demonstrates <rect rx> rounded corners, <extrude symmetric> centred extrude, and <cut> end-face mitering / beveling / freeform. Seven 30 mm cuboid bases laid out along x at 60 mm spacing — left to right: sharp rect baseline, rect rx=3, rect rx=12 (clamps to half-edge → capsule), extrude symmetric, cut miter on end face, cut compound (miter+bevel), cut freeform (cylinder cutter through a cuboid)."
 

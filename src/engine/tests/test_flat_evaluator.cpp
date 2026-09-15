@@ -5385,3 +5385,174 @@ TEST(FlatStlImport, MissingSourceFileIsCompileError) {
             return e.message.find("cannot find referenced file") != std::string::npos;
         }));
 }
+
+// ─── Part textures (spec 0.3 §5.1) ───────────────────────────────────
+//
+// The engine delivers the image bytes + MIME + a resolved tile size per
+// part; it never generates UVs (renderers project the image — see
+// PartTexture in flat_evaluator.hpp).
+
+namespace {
+
+const std::string kFakePng = std::string("\x89PNG\r\n\x1a\n", 8) + "payload";
+
+std::string textured_box(std::string_view extra_attrs, double w = 20,
+                         double d = 10, double h = 5) {
+    return "version 0.3\n"
+           "<part name=\"box\" texture-data=\"" + base64_encode(kFakePng) +
+           "\" texture-type=\"image/png\" " + std::string(extra_attrs) + ">"
+           "<extrude height=\"" + std::to_string(h) + "\">"
+           "<rect width=\"" + std::to_string(w) + "\" height=\"" +
+           std::to_string(d) + "\"/></extrude></part>";
+}
+
+}  // namespace
+
+TEST(FlatEvaluatorTexture, UntexturedPartHasNoTexture) {
+    auto doc = parse_authoring(
+        "version 0.3\n<part name=\"p\"><circle r=\"5\"/></part>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok());
+    ASSERT_EQ(r.parts.size(), 1u);
+    EXPECT_FALSE(r.parts[0].texture.has_value());
+    EXPECT_TRUE(r.warnings.empty());
+}
+
+TEST(FlatEvaluatorTexture, EmbeddedTextureIsDecodedWithDefaultScale) {
+    auto doc = parse_authoring(textured_box(""));
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    ASSERT_EQ(r.parts.size(), 1u);
+    ASSERT_TRUE(r.parts[0].texture.has_value());
+    const auto& t = *r.parts[0].texture;
+    EXPECT_EQ(t.mime,  "image/png");
+    EXPECT_EQ(t.bytes, kFakePng);
+    // No texture-scale: default is the largest AABB extent (20 x 10 x 5).
+    EXPECT_NEAR(t.scale, 20.0, 1e-9);
+    EXPECT_TRUE(r.warnings.empty());
+}
+
+TEST(FlatEvaluatorTexture, ExplicitScaleExpressionUsesPartParams) {
+    auto doc = parse_authoring(
+        "version 0.3\n"
+        "<part name=\"box\" texture-data=\"" + base64_encode(kFakePng) +
+        "\" texture-type=\"image/png\" texture-scale=\"{tile * 2}\">"
+        "<param name=\"tile\" value=\"7.5\"/>"
+        "<extrude height=\"5\"><rect width=\"20\" height=\"10\"/></extrude>"
+        "</part>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    ASSERT_TRUE(r.parts[0].texture.has_value());
+    EXPECT_NEAR(r.parts[0].texture->scale, 15.0, 1e-9);
+}
+
+TEST(FlatEvaluatorTexture, NonPositiveScaleFallsBackToExtentWithWarning) {
+    auto doc = parse_authoring(textured_box("texture-scale=\"0\""));
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok());
+    ASSERT_TRUE(r.parts[0].texture.has_value());
+    EXPECT_NEAR(r.parts[0].texture->scale, 20.0, 1e-9);
+    EXPECT_TRUE(any_warning_contains(r, "must be positive"));
+}
+
+TEST(FlatEvaluatorTexture, UnevaluableScaleFallsBackToExtentWithWarning) {
+    auto doc = parse_authoring(textured_box("texture-scale=\"{nope}\""));
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok());
+    ASSERT_TRUE(r.parts[0].texture.has_value());
+    EXPECT_NEAR(r.parts[0].texture->scale, 20.0, 1e-9);
+    EXPECT_TRUE(any_warning_contains(r, "texture-scale"));
+}
+
+TEST(FlatEvaluatorTexture, EmptyMeshDefaultsScaleToOne) {
+    auto doc = parse_authoring(
+        "version 0.3\n<part name=\"p\" texture-data=\"" +
+        base64_encode(kFakePng) + "\" texture-type=\"image/png\"/>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok());
+    ASSERT_TRUE(r.parts[0].texture.has_value());
+    EXPECT_NEAR(r.parts[0].texture->scale, 1.0, 1e-12);
+}
+
+TEST(FlatEvaluatorTexture, InvalidBase64YieldsWarningAndNoTexture) {
+    auto doc = parse_authoring(
+        "version 0.3\n<part name=\"p\" texture-data=\"@@not-base64@@\""
+        " texture-type=\"image/png\"><circle r=\"1\"/></part>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok()) << "a bad texture must not fail the geometry";
+    EXPECT_FALSE(r.parts[0].texture.has_value());
+    EXPECT_TRUE(any_warning_contains(r, "not valid base64"));
+}
+
+TEST(FlatEvaluatorTexture, UnsupportedMimeYieldsWarningAndNoTexture) {
+    // Hand-authored flat docs bypass the bundler's schema check.
+    auto doc = parse_authoring(
+        "version 0.3\n<part name=\"p\" texture-data=\"QUJDRA==\""
+        " texture-type=\"image/webp\"><circle r=\"1\"/></part>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok());
+    EXPECT_FALSE(r.parts[0].texture.has_value());
+    EXPECT_TRUE(any_warning_contains(r, "unsupported `texture-type`"));
+}
+
+TEST(FlatEvaluatorTexture, UnresolvedSrcYieldsWarningAndNoTexture) {
+    // `texture="…"` that the bundler never lowered (raw authoring doc
+    // handed straight to the engine).
+    auto doc = parse_authoring(
+        "version 0.3\n<part name=\"p\" texture=\"grass.png\">"
+        "<circle r=\"1\"/></part>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok());
+    EXPECT_FALSE(r.parts[0].texture.has_value());
+    EXPECT_TRUE(any_warning_contains(r, "was not embedded"));
+}
+
+TEST(FlatEvaluatorTexture, DefTexturePropagatesIntoUntexturedHostPart) {
+    // Mirror of ImportedDefColorPropagatesIntoColorlessPart: the
+    // bundler leaves an imported <part texture> on its <def>; a host
+    // part with no texture of its own inherits it (scale included).
+    auto doc = parse_authoring(
+        "version 0.3\n"
+        "<def name=\"plank\" texture-data=\"" + base64_encode(kFakePng) +
+        "\" texture-type=\"image/jpeg\" texture-scale=\"40\">"
+        "<extrude height=\"5\"><rect width=\"20\" height=\"10\"/></extrude>"
+        "</def>"
+        "<part name=\"deck\"><plank/></part>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    ASSERT_TRUE(r.parts[0].texture.has_value());
+    EXPECT_EQ(r.parts[0].texture->mime, "image/jpeg");
+    EXPECT_EQ(r.parts[0].texture->bytes, kFakePng);
+    EXPECT_NEAR(r.parts[0].texture->scale, 40.0, 1e-9);
+}
+
+TEST(FlatEvaluatorTexture, ExplicitPartTextureBeatsDefTexture) {
+    const std::string other = "other image bytes";
+    auto doc = parse_authoring(
+        "version 0.3\n"
+        "<def name=\"plank\" texture-data=\"" + base64_encode(kFakePng) +
+        "\" texture-type=\"image/jpeg\">"
+        "<extrude height=\"5\"><rect width=\"20\" height=\"10\"/></extrude>"
+        "</def>"
+        "<part name=\"deck\" texture-data=\"" + base64_encode(other) +
+        "\" texture-type=\"image/png\"><plank/></part>");
+    auto r = evaluate_flat(doc);
+    ASSERT_TRUE(r.ok());
+    ASSERT_TRUE(r.parts[0].texture.has_value());
+    EXPECT_EQ(r.parts[0].texture->mime,  "image/png");
+    EXPECT_EQ(r.parts[0].texture->bytes, other);
+}
+
+TEST(FlatEvaluatorTexture, TextureDoesNotChangeGeometry) {
+    auto plain = evaluate_flat(parse_authoring(
+        "version 0.3\n<part name=\"box\">"
+        "<extrude height=\"5\"><rect width=\"20\" height=\"10\"/></extrude>"
+        "</part>"));
+    auto textured = evaluate_flat(parse_authoring(textured_box("")));
+    ASSERT_TRUE(plain.ok());
+    ASSERT_TRUE(textured.ok());
+    EXPECT_EQ(plain.parts[0].mesh.triangle_count(),
+              textured.parts[0].mesh.triangle_count());
+    EXPECT_EQ(plain.parts[0].mesh.vertex_count(),
+              textured.parts[0].mesh.vertex_count());
+}

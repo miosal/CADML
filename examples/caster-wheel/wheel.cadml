@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Caster wheel — solid disc with a hub bore. One port (`hub`) at the wheel's geometric centre, used to mount the wheel on an axle. Local frame: rotation axis along z, wheel symmetric about z = 0 (spans z = -thickness/2 to z = +thickness/2) so port-mating places it centred on the axle."
 

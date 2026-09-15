@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "L-bracket extrude — a minimal test of <extrude> over a non-convex (L-shaped) profile traced with a closed <path>. The top and bottom caps are tessellated from the same six-vertex polygon that defines the side walls."
 

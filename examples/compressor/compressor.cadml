@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Centrifugal turbo compressor wheel: revolved hub + 6 main blades + 6 splitter blades, all parametric. Each blade is a polyhedral loft over 20 stations along the meridional curve, with the airfoil cross-section, blade height, blade angle (backsweep), and thickness all computed from Lua functions in compressor.lua. Hub is a revolve of a Lua-generated meridional path; blades use <for>-unrolled sketches inside <loft>."
 

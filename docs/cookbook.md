@@ -4,7 +4,7 @@ Common CADML patterns and the canonical way to write them.
 
 The cookbook assumes you already know:
 
-- Frontmatter is line-oriented (`version 0.2`, `units mm`,
+- Frontmatter is line-oriented (`version 0.3`, `units mm`,
   `param name = value`), **terminates at the first `<`**.
 - The body has one or more top-level `<part>`/`<assembly>` exports
   plus optional `<def>`s and `<script>`s. The common case is one
@@ -55,7 +55,7 @@ a `param`, body uses one `<difference>` of an extruded rect minus two
 overshooting cylinders.
 
 ```
-version 0.2
+version 0.3
 units mm
 description "Mounting plate with two through-holes."
 
@@ -278,7 +278,7 @@ end
 **File: `wing.cadml`** (the part that consumes it)
 
 ```
-version 0.2
+version 0.3
 units mm
 description "Trapezoidal wing: extruded NACA-2412 cross-section."
 
@@ -323,7 +323,7 @@ Reusable geometry block + N call sites, all in one file. The `<def>`
 as an element — there is **no `<use>` tag**.
 
 ```
-version 0.2
+version 0.3
 units mm
 
 param plate-t = 6
@@ -476,7 +476,7 @@ on each imported `<part>` define the mating frames.
 **File: `motor.cadml`**
 
 ```
-version 0.2
+version 0.3
 units mm
 
 param body-l = 50
@@ -494,7 +494,7 @@ param body-r = 20
 **File: `drivetrain.cadml`**
 
 ```
-version 0.2
+version 0.3
 units mm
 
 import "motor.cadml" as motor
@@ -577,6 +577,33 @@ then difference.
 
 `<select>` defaults to `all`; future versions will accept selectors
 (e.g., `select="convex.top"`) to limit which edges get rounded.
+
+---
+
+## Recipe 16 — Textures (spec 0.3)
+
+Appearance only. Put an image next to the file and reference it from
+the `<part>`; the compiler embeds it, the renderer tiles it over every
+face by triplanar projection. `texture-scale` is the size of one tile in
+document units — think "how big is one brick / one grass clump".
+
+```xml
+version 0.3
+units mm
+
+<part name="wall" color="#b0553a" texture="brick.jpg" texture-scale="215">
+  <extrude height="2400"><rect width="3000" height="200"/></extrude>
+</part>
+```
+
+- `.png` and `.jpg`/`.jpeg` only; relative paths only (no `..` escapes).
+- Leave `texture-scale` out and the image tiles once across the part's
+  largest dimension.
+- `color` stays as the fallback for consumers without texture support.
+- One texture per part. Two materials on one body → two `<part>`s (the
+  same rule as per-part colours; see `examples/caster-wheel/`).
+- Textures never change volume, mass, exports or checks —
+  `examples/showcase-texture/` is the reference file.
 
 ---
 

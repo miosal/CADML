@@ -29,7 +29,7 @@ statement matches one of:
 
 | Statement | Form | Example |
 |---|---|---|
-| Setting | `<key> <value>` | `version 0.2` |
+| Setting | `<key> <value>` | `version 0.3` |
 | Description | `description "<string>"` | `description "M8 hex bolt"` |
 | Tags | `tags "<string>"` | `tags "fastener,bolt"` |
 | Import | `import "<path>" [as <alias>]` | `import "x.lua" as x` |
@@ -48,7 +48,7 @@ statement matches one of:
 **Comment rules:**
 
 - `# ...` to end of line is a comment. Comments may stand alone or
-  follow a statement: `version 0.2 # bumped from 0.1`.
+  follow a statement: `version 0.3 # bumped from 0.2`.
 - Comments do **not** continue across lines. There is no `/* ... */`
   block-comment form in frontmatter.
 - A line starting with `#` is a pure comment line.
@@ -539,7 +539,7 @@ If you're writing a bundler from scratch:
   assemblies — assemblies use it for port positions.
 - **Then assemblies.** Single-level first (one `<assembly>` with bare
   instances), then mating with `at`/`port`, then nested.
-- `<cut>` is not lowered in 0.2 — the evaluator handles it. If you
+- `<cut>` is not lowered in 0.3 — the evaluator handles it. If you
   ever do add a compiler-side lowering pass, save it for last; the
   edge-selection algorithm is the hairiest in the codebase.
 

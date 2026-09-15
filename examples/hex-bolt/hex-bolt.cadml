@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "M8 x 50 hex-head cap screw with a sharp-V helical thread cut into the shank and a cone-tapered lead-in tip. Exercises helical-sweep + Boolean-subtract; geometry is stylised, not engineering-grade."
 

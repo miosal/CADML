@@ -2,7 +2,8 @@
 // Copyright 2026 miosal@cadml.org
 
 #include <cadml/compile/bundler.hpp>
-#include <cadml/constants.hpp>          // kMaxSourceBytes
+#include <cadml/base64.hpp>
+#include <cadml/constants.hpp>          // kMaxSourceBytes, kMaxTextureBytes
 
 #include <gtest/gtest.h>
 
@@ -368,4 +369,148 @@ TEST(InMemory, ParityWithCompileStringSingleFile) {
         return pos == std::string::npos ? s : s.substr(pos);
     };
     EXPECT_EQ(body(a.flat_text), body(b.flat_text));
+}
+
+// ─── texture="…" inlining (spec 0.3 §5.1) ────────────────────────────
+
+namespace {
+const std::string kPngBytes = std::string("\x89PNG\r\n\x1a\n", 8) + "fake";
+}
+
+TEST(InMemory, TexturePathInlinedAsDataAndType) {
+    auto r = compile_in_memory(
+        files({
+            { "textures/grass.PNG", kPngBytes },
+            { "main.cadml",
+              "version 0.3\n"
+              "<part name=\"lawn\" texture=\"textures/grass.PNG\""
+              " texture-scale=\"200\"><circle r=\"1\"/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    // Lowered: src cleared, bytes embedded, MIME derived from the
+    // (case-insensitive) extension, scale carried through.
+    const auto& pa = std::get<cadml::PartAttrs>(r.document.nodes[0].attrs);
+    EXPECT_TRUE(pa.texture.src.empty());
+    EXPECT_EQ(pa.texture.type, "image/png");
+    EXPECT_EQ(pa.texture.scale_expr, "200");
+    EXPECT_EQ(cadml::base64_decode(pa.texture.data), kPngBytes);
+    EXPECT_EQ(r.flat_text.find("texture=\""), std::string::npos)
+        << "flat output must not reference the external file";
+    EXPECT_NE(r.flat_text.find("texture-type=\"image/png\""),
+              std::string::npos);
+    // Flat output is self-contained: recompiling it needs no files.
+    auto r2 = compile_string(r.flat_text);
+    EXPECT_TRUE(r2.ok()) << (r2.errors.empty() ? "" : r2.errors[0].message);
+}
+
+TEST(InMemory, TextureJpegExtensionMapsToJpegMime) {
+    auto r = compile_in_memory(
+        files({
+            { "oak.jpeg", "jpeg bytes" },
+            { "main.cadml",
+              "version 0.3\n<part texture=\"oak.jpeg\"/>" },
+        }),
+        "main.cadml");
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    const auto& pa = std::get<cadml::PartAttrs>(r.document.nodes[0].attrs);
+    EXPECT_EQ(pa.texture.type, "image/jpeg");
+}
+
+TEST(InMemory, TextureResolvesRelativeToAuthoringFile) {
+    // Like imports and <stl src>, the path is relative to the file that
+    // authored the element, not the entry file.
+    auto r = compile_in_memory(
+        files({
+            { "lib/plank.cadml",
+              "version 0.3\n<part name=\"plank\" texture=\"wood.png\">"
+              "<extrude height=\"1\"><circle r=\"1\"/></extrude></part>" },
+            { "lib/wood.png", kPngBytes },
+            { "main.cadml",
+              "version 0.3\nimport \"lib/plank.cadml\"\n"
+              "<part name=\"deck\"><plank/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_TRUE(r.ok()) << (r.errors.empty() ? "" : r.errors[0].message);
+    // The imported part became a <def>; its texture rides along as the
+    // carrier the engine reads when the host part has none.
+    bool def_has_texture = false;
+    for (const auto& n : r.document.nodes) {
+        if (n.dead || n.type != cadml::NodeType::Def) continue;
+        const auto& da = std::get<cadml::DefAttrs>(n.attrs);
+        if (da.name == "plank" && !da.texture.data.empty() &&
+            da.texture.type == "image/png") def_has_texture = true;
+    }
+    EXPECT_TRUE(def_has_texture);
+}
+
+TEST(InMemory, TextureAbsolutePathRejected) {
+    auto r = compile_in_memory(
+        files({ { "main.cadml",
+                  "version 0.3\n<part texture=\"/etc/passwd.png\"/>" } }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Import);
+    EXPECT_NE(r.errors[0].message.find("absolute paths"), std::string::npos);
+}
+
+TEST(InMemory, TextureEscapePathRejected) {
+    auto r = compile_in_memory(
+        files({ { "main.cadml",
+                  "version 0.3\n<part texture=\"../../escape.png\"/>" } }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("outside the project root"),
+              std::string::npos);
+}
+
+TEST(InMemory, TextureUnsupportedExtensionRejected) {
+    auto r = compile_in_memory(
+        files({
+            { "grass.gif", "gif bytes" },
+            { "main.cadml", "version 0.3\n<part texture=\"grass.gif\"/>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("not a supported image format"),
+              std::string::npos);
+}
+
+TEST(InMemory, TextureMissingFileRejected) {
+    auto r = compile_in_memory(
+        files({ { "main.cadml", "version 0.3\n<part texture=\"nope.png\"/>" } }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("cannot find referenced file"),
+              std::string::npos);
+}
+
+TEST(InMemory, TextureOversizeRejected) {
+    // Images have their own (smaller) cap than sources: kMaxTextureBytes.
+    auto r = compile_in_memory(
+        files({
+            { "big.png", std::string(cadml::kMaxTextureBytes + 1, 'p') },
+            { "main.cadml", "version 0.3\n<part texture=\"big.png\"/>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    EXPECT_NE(r.errors[0].message.find("size limit"), std::string::npos);
+    EXPECT_EQ(r.flat_text.find("texture-data"), std::string::npos)
+        << "oversize image must be refused, not embedded";
+}
+
+TEST(InMemory, TextureInSpec02ImportIsVocabularyError) {
+    // A 0.2 library carrying `texture` is a stale declaration in the
+    // library, reported as such rather than resolved.
+    auto r = compile_in_memory(
+        files({
+            { "grass.png", kPngBytes },
+            { "main.cadml",
+              "version 0.2\n<part texture=\"grass.png\"><circle r=\"1\"/></part>" },
+        }),
+        "main.cadml");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.errors[0].category, CompileError::Vocabulary);
+    EXPECT_NE(r.errors[0].message.find("since spec version 0.3"),
+              std::string::npos);
 }

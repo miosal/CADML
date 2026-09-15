@@ -1,4 +1,4 @@
-version 0.2
+version 0.3
 units mm
 description "Simple bolt — hex head + cylindrical shaft. One `<port>` named `head-seat` on the underside of the head (where it presses against whatever it's clamping). Mates into a `<port>` whose normal points in the opposite direction (anti-parallel = face-to-face)."
 

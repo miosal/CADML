@@ -1,0 +1,43 @@
+version 0.3
+units mm
+description "Texture showcase: a plank, a tile and a plain cube side by side. The plank and the tile carry the same checker.png through <part texture>, at two different texture-scale values, so a renderer that supports spec-0.3 textures shows one tiled coarsely and one finely; the cube has only a colour. Textures are appearance only — every part here has exactly the geometry, volume and exports it would have without them."
+
+param plank-l = 120
+param plank-w = 30
+param plank-t = 10
+param tile-side = 40
+param gap = 15
+
+<!-- Coarse tiling: one checker tile spans the plank's width. -->
+<part name="plank" color="#a0703c" texture="checker.png" texture-scale="{plank-w}">
+  <extrude height="{plank-t}">
+    <rect width="{plank-l}" height="{plank-w}"/>
+  </extrude>
+</part>
+
+<!-- Fine tiling: the same image at a quarter of the tile's side. The
+     rounded bore proves textures ride along on CSG results too. -->
+<part name="tile" color="#888888" texture="checker.png" texture-scale="{tile-side / 4}">
+  <group transform="translate(0, {plank-w + gap}, 0)">
+    <difference>
+      <extrude height="{plank-t}">
+        <rect width="{tile-side}" height="{tile-side}"/>
+      </extrude>
+      <group transform="translate({tile-side / 2}, {tile-side / 2}, -1)">
+        <extrude height="{plank-t + 2}">
+          <circle r="{tile-side / 5}"/>
+        </extrude>
+      </group>
+    </difference>
+  </group>
+</part>
+
+<!-- No texture at all: the renderer shows the colour. Untextured parts
+     tile nothing — a `texture-scale` alone would be a schema error. -->
+<part name="cube" color="#4a7a2e">
+  <group transform="translate({tile-side + gap}, {plank-w + gap}, 0)">
+    <extrude height="{tile-side}">
+      <rect width="{tile-side}" height="{tile-side}"/>
+    </extrude>
+  </group>
+</part>

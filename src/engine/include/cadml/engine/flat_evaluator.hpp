@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -92,6 +93,21 @@ struct EvalOptions {
     FlatMeshCache* cache = nullptr;
 };
 
+// A part's surface texture as delivered to a renderer (spec 0.3, §5.1).
+//
+// CADML meshes have no UV channel, so the image is meant to be applied
+// by a projection that needs only world position + normal — the
+// reference consumers use triplanar mapping. `scale` is the world-space
+// size (document units) of one texture tile: `uv = surface_coord /
+// scale`. It is always resolved to a positive number here — the
+// authored `texture-scale` when given, else the part's largest
+// bounding-box extent so the image tiles once across the part.
+struct PartTexture {
+    std::string mime;     // "image/png" | "image/jpeg"
+    std::string bytes;    // the decoded image file bytes, as-is
+    double      scale = 0;
+};
+
 // Output of evaluating a flat document.
 //
 //   parts  — one entry per top-level <part>, in document order. Empty
@@ -106,6 +122,14 @@ struct [[nodiscard]] FlatEvalResult {
         // (the parser already shape-checks `#RGB` / `#RRGGBB`).
         std::string color;
         FlatMesh    mesh;
+
+        // Surface texture (spec 0.3 `texture="…"`), resolved the same
+        // way `color` is: the part's own texture, else the texture an
+        // imported `<part texture>` left on its `<def>`. `has_value()`
+        // is false when the part is untextured or its image could not
+        // be decoded (a warning says why). The engine never generates
+        // texture coordinates — see `PartTexture`.
+        std::optional<PartTexture> texture;
     };
 
     std::vector<Part>           parts;
