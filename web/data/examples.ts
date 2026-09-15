@@ -193,10 +193,9 @@ function blade_section(h, t)
 end
 `;
 
-// Caster wheel assembly — flattened from the canonical 4-file example
+// Caster wheel assembly, flattened from the canonical 4-file example
 // (caster-wheel/{caster-wheel,fork,axle,wheel}.cadml) into one source
-// for the editor pane. STL export merges all parts into a single
-// triangle soup, so the rendered colour comes from the first <part>.
+// for the editor pane. Each top-level <part> renders in its own colour.
 const CASTER_WHEEL_CADML = `version 0.3
 units mm
 description "Caster-wheel assembly: a fork, an axle, and a wheel emitted as three top-level <part>s. The canonical example splits these into four files; the geometry is flattened here for a single-pane view."
@@ -362,7 +361,7 @@ param base-bevel  = 2
 
 const PLANTER_CADML = `version 0.3
 units mm
-description "Raised garden bed: a brick wall ring with a timber coping and a lawn inside. The brick and grass are image textures on the parts, tiled by the renderer — the geometry is three plain bodies."
+description "Raised garden bed: a brick wall ring with a timber coping and a lawn inside. The brick and grass are image textures on the parts, tiled by the renderer; the geometry is three plain bodies."
 
 param bed-l    = 900
 param bed-w    = 600
